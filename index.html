@@ -682,17 +682,16 @@ document.getElementById("startGameBtn").addEventListener("click", ()=>{
     alert("Lütfen A ve B taraflarına birer oyuncu seçin.");
     return;
   }
-  fbUpdate(`${tablesPath()}/${currentTableId}`, {
-    seated: { A: setupPick.seated.A, B: setupPick.seated.B },
-    partners: { A: setupPick.partners.A, B: setupPick.partners.B }
-  });
-  setTimeout(()=> startGameForTable(currentTableId), 150);
+  const seated = { A: setupPick.seated.A, B: setupPick.seated.B };
+  const partners = { A: setupPick.partners.A, B: setupPick.partners.B };
+  const game = buildInitialGame(seated, partners);
+  // Koltuk/ortak bilgisi ve oyun nesnesi TEK seferde yazılır (yarış durumu olmasın diye
+  // önceki sürümdeki setTimeout ile ayrı yazma kaldırıldı).
+  fbUpdate(`${tablesPath()}/${currentTableId}`, { seated, partners, game });
+  goScreen("s4", currentTableId);
 });
 
-function startGameForTable(id){
-  const t = STATE.tables[id];
-  const seated = t ? t.seated : setupPick.seated;
-  const partners = t ? t.partners : setupPick.partners;
+function buildInitialGame(seated, partners){
   const participants = side => {
     const obj = { seated: {active:true, lockedAt:null} };
     obj.partners = {};
@@ -701,13 +700,22 @@ function startGameForTable(id){
     });
     return obj;
   };
-  const game = {
+  return {
     multiplier: 1,
     finished: false,
-    canCall: null,
+    blockedCallers: {},
     vidoLog: [],
     status: { A: participants("A"), B: participants("B") }
   };
+}
+
+function startGameForTable(id){
+  const t = STATE.tables[id];
+  if (!t || !t.seated || !t.seated.A || !t.seated.B){
+    alert("Önce A ve B taraflarına oyuncu atayın.");
+    return;
+  }
+  const game = buildInitialGame(t.seated, t.partners);
   fbSet(`${tablesPath()}/${id}/game`, game);
   goScreen("s4", id);
 }
@@ -779,13 +787,14 @@ function rowHtml(name, tag, active, lockedAt){
   return `<div class="p-row"><span class="pname">${escapeHtml(name)} <span class="ptag">${tag}</span></span>${pill}</div>`;
 }
 
-/* Vido çağıracak oyuncuyu seçme - artık herkes (oturan + ortak) çekebilir */
+/* Vido çağıracak oyuncuyu seçme - herkes (oturan + ortak) bağımsız çekebilir.
+   Sadece az önce KENDİSİ çeken kişi, karşı taraf çekip kendisi görene kadar
+   tekrar çekemez. Aynı taraftaki diğer kişiler bundan etkilenmez. */
 function renderVidoCallPicker(t, g){
   const wrap = document.getElementById("vidoCallWrap");
   wrap.innerHTML = "";
-  const canCall = g.canCall || null;
+  const blocked = g.blockedCallers || {};
   ["A","B"].forEach(side=>{
-    const sideBlocked = canCall && canCall !== side;
     const st = g.status[side];
     const people = [];
     if (st.seated.active) people.push(t.seated[side]);
@@ -794,20 +803,22 @@ function renderVidoCallPicker(t, g){
       const btn = document.createElement("button");
       btn.className = "pick " + (side==="A" ? "sel-a" : "sel-b");
       btn.textContent = `🎲 ${name}`;
-      btn.disabled = sideBlocked;
+      btn.disabled = !!blocked[name];
+      wrap.appendChild(btn);
+      if (blocked[name]) return;
       btn.addEventListener("click", ()=>{
         pendingVidoCallingSide = side;
         pendingVidoCallerName = name;
         openVidoResponseScreen();
       });
-      wrap.appendChild(btn);
     });
   });
-  if (canCall){
+  const blockedNames = Object.keys(blocked).filter(n=>blocked[n]);
+  if (blockedNames.length){
     const note = document.createElement("div");
     note.className = "small-note";
     note.style.width = "100%";
-    note.textContent = `Sıra ${canCall} tarafında — karşı taraf görmeden diğer taraf tekrar çekemez.`;
+    note.textContent = `${blockedNames.join(", ")} karşı taraf çekip kendisi görene kadar tekrar çekemez.`;
     wrap.appendChild(note);
   }
 }
@@ -848,55 +859,86 @@ function openVidoResponseScreen(){
 }
 
 document.getElementById("confirmVidoBtn").addEventListener("click", ()=>{
-  const t = STATE.tables[currentTableId];
-  const g = t.game;
-  const callingSide = pendingVidoCallingSide;
-  const oppSide = callingSide === "A" ? "B" : "A";
-  const oldMult = g.multiplier;
-  const newMult = oldMult * 2;
+  try{
+    const t = STATE.tables[currentTableId];
+    const g = t.game;
+    const callingSide = pendingVidoCallingSide;
+    const callerName = pendingVidoCallerName;
+    const oppSide = callingSide === "A" ? "B" : "A";
+    const oldMult = g.multiplier;
+    const newMult = oldMult * 2;
 
-  const responses = {};
-  document.querySelectorAll("#vidoRespWrap .toggle-group").forEach(grp=>{
-    const name = grp.getAttribute("data-name");
-    const sawIt = grp.querySelector(".gor").classList.contains("on");
-    responses[name] = sawIt;
-  });
+    const responses = {};
+    document.querySelectorAll("#vidoRespWrap .toggle-group").forEach(grp=>{
+      const name = grp.getAttribute("data-name");
+      const sawIt = grp.querySelector(".gor").classList.contains("on");
+      responses[name] = sawIt;
+    });
 
-  const st = g.status[oppSide];
-  const declined = [];
-  if (st.seated.active){
-    if (responses[t.seated[oppSide]] === false){
-      st.seated.active = false; st.seated.lockedAt = oldMult; declined.push(t.seated[oppSide]);
+    g.blockedCallers = g.blockedCallers || {};
+
+    const st = g.status[oppSide];
+    const declined = [];
+    const accepted = [];
+    if (st.seated.active){
+      if (responses[t.seated[oppSide]] === false){
+        st.seated.active = false; st.seated.lockedAt = oldMult; declined.push(t.seated[oppSide]);
+      } else {
+        accepted.push(t.seated[oppSide]);
+      }
     }
-  }
-  Object.keys(st.partners||{}).forEach(name=>{
-    const p = st.partners[name];
-    if (p.active && responses[name] === false){
-      p.active = false; p.lockedAt = oldMult; declined.push(name);
+    Object.keys(st.partners||{}).forEach(name=>{
+      const p = st.partners[name];
+      if (p.active){
+        if (responses[name] === false){
+          p.active = false; p.lockedAt = oldMult; declined.push(name);
+        } else {
+          accepted.push(name);
+        }
+      }
+    });
+
+    // Çağıran kişi artık (karşı taraf çekip kendisi görene kadar) tekrar çekemez.
+    g.blockedCallers[callerName] = true;
+    // Bu vidoyu gören (kabul eden) kişilerin önceki kilidi kalkar.
+    accepted.forEach(name=>{ delete g.blockedCallers[name]; });
+
+    g.vidoLog = g.vidoLog || [];
+    g.vidoLog.push({ side: callingSide, by: callerName, from: oldMult, to: newMult, declined });
+
+    const oppActive = st.seated.active || Object.values(st.partners||{}).some(p=>p.active);
+    if (!oppActive){
+      finishGame(currentTableId, callingSide, oldMult, g);
+    } else {
+      g.multiplier = newMult;
+      fbSet(`${tablesPath()}/${currentTableId}/game`, g);
     }
-  });
-
-  g.vidoLog = g.vidoLog || [];
-  g.vidoLog.push({ side: callingSide, by: pendingVidoCallerName, from: oldMult, to: newMult, declined });
-
-  const oppActive = st.seated.active || Object.values(st.partners||{}).some(p=>p.active);
-  if (!oppActive){
-    finishGame(currentTableId, callingSide, oldMult, g);
-  } else {
-    g.multiplier = newMult;
-    g.canCall = oppSide;
-    fbSet(`${tablesPath()}/${currentTableId}/game`, g);
+    goScreen("s4");
+  } catch(e){
+    console.error(e);
+    alert("Vido kaydedilirken bir hata oluştu: " + e.message);
   }
-  goScreen("s4");
 });
 
 document.getElementById("aWinsBtn").addEventListener("click", ()=>{
-  const t = STATE.tables[currentTableId];
-  finishGame(currentTableId, "A", t.game.multiplier, t.game);
+  try{
+    const t = STATE.tables[currentTableId];
+    if (!t || !t.game){ alert("Oyun verisi henüz yüklenmedi, lütfen tekrar deneyin."); return; }
+    finishGame(currentTableId, "A", t.game.multiplier, t.game);
+  } catch(e){
+    console.error(e);
+    alert("El kapatılırken bir hata oluştu: " + e.message);
+  }
 });
 document.getElementById("bWinsBtn").addEventListener("click", ()=>{
-  const t = STATE.tables[currentTableId];
-  finishGame(currentTableId, "B", t.game.multiplier, t.game);
+  try{
+    const t = STATE.tables[currentTableId];
+    if (!t || !t.game){ alert("Oyun verisi henüz yüklenmedi, lütfen tekrar deneyin."); return; }
+    finishGame(currentTableId, "B", t.game.multiplier, t.game);
+  } catch(e){
+    console.error(e);
+    alert("El kapatılırken bir hata oluştu: " + e.message);
+  }
 });
 
 /* ===================== İKİLİ (KİŞİ-KİŞİ) HESAPLAŞMA MOTORU =====================
@@ -961,6 +1003,9 @@ function buildResultsFromPairwise(pair, unit){
 
 function finishGame(tableId, winnerSide, finalMultiplier, g){
   const t = STATE.tables[tableId];
+  if (!t || !t.seated || !t.seated.A || !t.seated.B){
+    throw new Error("Masa verisi eksik (oturanlar bulunamadı).");
+  }
   const unit = STATE.settings.unitAmount || 0;
   const pair = computeSettlements(t, winnerSide, finalMultiplier);
   const results = buildResultsFromPairwise(pair, unit);
