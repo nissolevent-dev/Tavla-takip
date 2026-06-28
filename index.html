@@ -261,6 +261,7 @@
       <div id="tableListWrap"></div>
       <div class="empty-msg" id="noTableMsg">Henüz masa yok. "+ Yeni Masa" ile başlayın.</div>
       <button class="btn-ghost" id="newSessionBtn" style="display:block;margin:16px auto 0;">Yeni Oturum Başlat</button>
+      <button class="btn-ghost" id="deleteSessionBtn" style="display:block;margin:6px auto 0;color:var(--red);">Bu Oturumu Sil</button>
     </div>
 
   </div>
@@ -272,32 +273,7 @@
       <span id="setupTableName" style="color:#fff;font-weight:800;"></span>
     </div>
 
-    <div class="row" style="margin-bottom:12px;">
-      <button class="btn-soft btn-sm" id="modeManualBtn">Manuel Kurulum</button>
-      <button class="btn-soft btn-sm" id="modeDiceBtn">Zar Sırasına Göre</button>
-    </div>
-
-    <div id="manualSetupView">
-      <div class="card">
-        <h2>Oturanlar (A / B)</h2>
-        <div class="small-note">Bir oyuncuya dokunarak A veya B tarafına atayın.</div>
-        <div class="player-pick" id="seatPickWrap"></div>
-      </div>
-
-      <div class="card">
-        <h2>A Tarafı Ortakları</h2>
-        <div class="player-pick" id="partnerAWrap"></div>
-      </div>
-
-      <div class="card">
-        <h2>B Tarafı Ortakları</h2>
-        <div class="player-pick" id="partnerBWrap"></div>
-      </div>
-
-      <button class="btn-main" id="startGameBtn">Eli Başlat</button>
-    </div>
-
-    <div id="diceSetupView" style="display:none;">
+    <div id="diceSetupView">
       <div class="card">
         <h2>Masadaki Oyuncular</h2>
         <div class="small-note">Bu masada kimler oynuyor, seçin.</div>
@@ -373,6 +349,7 @@
     <div class="card">
       <h2>Oturum</h2>
       <select id="totalsSessionSelect"></select>
+      <button class="btn-ghost" id="deleteTotalsSessionBtn" style="display:none;color:var(--red);">Bu Oturumu Sil</button>
     </div>
     <div class="card">
       <h2>Toplam (₺)</h2>
@@ -421,8 +398,6 @@ let STATE = {
 };
 let currentScreen = "s1";
 let currentTableId = null;
-let setupPick = { seated: {A:null, B:null}, partners: {A:{}, B:{}} };
-let setupMode = "manual"; // "manual" | "dice"
 let dicePick = { selected: {}, ranking: [] };
 let pendingVidoCallerName = null;
 let sessionPlayerPick = {};
@@ -643,6 +618,17 @@ document.getElementById("newSessionBtn").addEventListener("click", ()=>{
   }
 });
 
+document.getElementById("deleteSessionBtn").addEventListener("click", ()=>{
+  const s = STATE.sessions[STATE.activeSessionId];
+  if (!s) return;
+  if (confirm(`"${s.name}" oturumu ve içindeki tüm masalar/geçmiş tamamen silinsin mi? Bu işlem geri alınamaz.`)){
+    fbRemove(`sessions/${STATE.activeSessionId}`);
+    fbSet("activeSessionId", null);
+    sessionPlayerPick = {};
+    forcingNewSession = false;
+  }
+});
+
 document.getElementById("newTableBtn").addEventListener("click", ()=>{
   const count = Object.keys(STATE.tables).length + 1;
   const ref = fbPush(tablesPath(), {
@@ -652,8 +638,6 @@ document.getElementById("newTableBtn").addEventListener("click", ()=>{
     game: null,
     history: {}
   });
-  setupPick = { seated:{A:null,B:null}, partners:{A:{},B:{}} };
-  setupMode = "manual";
   dicePick = { selected:{}, ranking:[] };
   goScreen("s3", ref.key);
 });
@@ -701,88 +685,21 @@ function renderTablesScreen(){
 }
 
 function loadSetupPickFromTable(t){
-  setupMode = "manual";
   dicePick = { selected:{}, ranking:[] };
-  setupPick = {
-    seated: { A: (t.seated&&t.seated.A)||null, B: (t.seated&&t.seated.B)||null },
-    partners: {
-      A: Object.assign({}, (t.partners&&t.partners.A)||{}),
-      B: Object.assign({}, (t.partners&&t.partners.B)||{})
-    }
-  };
 }
 
-/* ===================== SCREEN 3: TABLE SETUP ===================== */
-function setSetupMode(mode){
-  setupMode = mode;
-  renderSetupScreen();
-}
-document.getElementById("modeManualBtn").addEventListener("click", ()=> setSetupMode("manual"));
-document.getElementById("modeDiceBtn").addEventListener("click", ()=> setSetupMode("dice"));
-
-function renderSetupScreen(){
-  const t = STATE.tables[currentTableId];
-  if (!t) return;
-  document.getElementById("setupTableName").textContent = t.name;
-  document.getElementById("manualSetupView").style.display = setupMode === "manual" ? "block" : "none";
-  document.getElementById("diceSetupView").style.display = setupMode === "dice" ? "block" : "none";
-  document.getElementById("modeManualBtn").classList.toggle("mode-active", setupMode==="manual");
-  document.getElementById("modeDiceBtn").classList.toggle("mode-active", setupMode==="dice");
-  if (setupMode === "dice"){ renderDiceSetupView(); return; }
-
-  const names = getSessionPlayerNames();
-
-  const seatWrap = document.getElementById("seatPickWrap");
-  seatWrap.innerHTML = "";
-  names.forEach(name=>{
-    const btn = document.createElement("button");
-    btn.className = "pick";
-    if (setupPick.seated.A === name) btn.classList.add("sel-a");
-    if (setupPick.seated.B === name) btn.classList.add("sel-b");
-    btn.textContent = name + (setupPick.seated.A===name?" (A)":setupPick.seated.B===name?" (B)":"");
-    btn.addEventListener("click", ()=>{
-      if (setupPick.seated.A === name) setupPick.seated.A = null;
-      else if (setupPick.seated.B === name) setupPick.seated.B = null;
-      else if (!setupPick.seated.A) setupPick.seated.A = name;
-      else if (!setupPick.seated.B) setupPick.seated.B = name;
-      else { alert("Önce A veya B'den birini boşaltın."); return; }
-      delete setupPick.partners.A[name];
-      delete setupPick.partners.B[name];
-      renderSetupScreen();
-    });
-    seatWrap.appendChild(btn);
-  });
-
-  renderPartnerPick("partnerAWrap", "A");
-  renderPartnerPick("partnerBWrap", "B");
-}
-
-function renderPartnerPick(wrapId, side){
-  const wrap = document.getElementById(wrapId);
-  wrap.innerHTML = "";
-  getSessionPlayerNames().forEach(name=>{
-    if (name === setupPick.seated.A || name === setupPick.seated.B) return;
-    const btn = document.createElement("button");
-    btn.className = "pick";
-    const isOtherSide = side==="A" ? setupPick.partners.B[name] : setupPick.partners.A[name];
-    if (isOtherSide) btn.classList.add("disabled");
-    if (setupPick.partners[side][name]) btn.classList.add(side==="A"?"sel-a":"sel-b");
-    btn.textContent = name;
-    btn.disabled = !!isOtherSide;
-    btn.addEventListener("click", ()=>{
-      if (setupPick.partners[side][name]) delete setupPick.partners[side][name];
-      else setupPick.partners[side][name] = true;
-      renderSetupScreen();
-    });
-    wrap.appendChild(btn);
-  });
-}
-
-/* ===================== ZAR SIRASINA GÖRE KURULUM =====================
+/* ===================== SCREEN 3: TABLE SETUP (ZAR SIRASINA GÖRE) =====================
    Kural: en büyük atan masada tek kalır (Kral). En küçük atan ilk
    rakip olur, ondan büyük olanlar sırayla rakip olur, kalanlar ortak.
    Kazanan hep tek kalır (Kral). Kaybeden (eski Kral veya yenilen rakip)
    sıranın sonuna eklenir, sıra hiç bozulmadan döner durur. */
+function renderSetupScreen(){
+  const t = STATE.tables[currentTableId];
+  if (!t) return;
+  document.getElementById("setupTableName").textContent = t.name;
+  renderDiceSetupView();
+}
+
 function renderDiceSetupView(){
   const names = getSessionPlayerNames();
 
@@ -879,18 +796,6 @@ document.getElementById("startDiceGameBtn").addEventListener("click", ()=>{
     usesRotation: true,
     game
   });
-  goScreen("s4", currentTableId);
-});
-
-document.getElementById("startGameBtn").addEventListener("click", ()=>{
-  if (!setupPick.seated.A || !setupPick.seated.B){
-    alert("Lütfen A ve B taraflarına birer oyuncu seçin.");
-    return;
-  }
-  const seated = { A: setupPick.seated.A, B: setupPick.seated.B };
-  const partners = { A: setupPick.partners.A, B: setupPick.partners.B };
-  const game = buildInitialGame(seated, partners);
-  fbUpdate(`${tablesPath()}/${currentTableId}`, { seated, partners, game, usesRotation: false, rotation: null });
   goScreen("s4", currentTableId);
 });
 
@@ -1191,6 +1096,18 @@ document.getElementById("totalsSessionSelect").addEventListener("change", e=>{
   renderTotalsScreen();
 });
 
+document.getElementById("deleteTotalsSessionBtn").addEventListener("click", ()=>{
+  if (totalsSelectedSession === "ALL") return;
+  const s = STATE.sessions[totalsSelectedSession];
+  if (!s) return;
+  if (confirm(`"${s.name}" oturumu ve içindeki tüm masalar/geçmiş tamamen silinsin mi? Bu işlem geri alınamaz.`)){
+    const wasActive = STATE.activeSessionId === totalsSelectedSession;
+    fbRemove(`sessions/${totalsSelectedSession}`);
+    if (wasActive) fbSet("activeSessionId", null);
+    totalsSelectedSession = "ALL";
+  }
+});
+
 function renderTotalsScreen(){
   if (totalsSelectedSession === null){
     totalsSelectedSession = STATE.activeSessionId || "ALL";
@@ -1201,6 +1118,7 @@ function renderTotalsScreen(){
     sessionEntries.map(([id,s])=>`<option value="${id}">${escapeHtml(s.name||id)}</option>`).join("");
   if ([...sel.options].some(o=>o.value===totalsSelectedSession)) sel.value = totalsSelectedSession;
   else { totalsSelectedSession = "ALL"; sel.value = "ALL"; }
+  document.getElementById("deleteTotalsSessionBtn").style.display = totalsSelectedSession === "ALL" ? "none" : "block";
 
   let rows = [];
   function collectFromSession(sid, s){
