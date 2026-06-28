@@ -146,14 +146,6 @@
   }
   .badge.live{background:#e3f3e8;color:var(--green);}
 
-  .mult-display{
-    text-align:center;
-    margin:6px 0 4px;
-  }
-  .mult-display .num{
-    font-size:54px;font-weight:900;color:var(--gold-dark);line-height:1;
-  }
-  .mult-display .lbl{font-size:12px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-top:2px;}
   .unit-note{text-align:center;font-size:12px;color:var(--muted);margin-bottom:14px;}
   .unit-note.warn{color:var(--red);font-weight:700;}
 
@@ -167,11 +159,14 @@
   .side-box .s-title{font-weight:800;font-size:13px;letter-spacing:1px;margin-bottom:8px;text-transform:uppercase;}
   .side-box.A .s-title{color:var(--sideA);}
   .side-box.B .s-title{color:var(--sideB);}
-  .p-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:14px;border-top:1px solid rgba(0,0,0,.06);}
-  .p-row:first-of-type{border-top:none;}
-  .p-row .pname{font-weight:600;}
+  .person-block{padding:6px 0;border-top:1px solid rgba(0,0,0,.06);}
+  .person-block:first-of-type{border-top:none;}
+  .p-row{display:flex;justify-content:space-between;align-items:center;font-size:14px;}
+  .p-row .pname{font-weight:700;}
   .p-row .ptag{font-size:10px;color:var(--muted);font-weight:600;}
-  .status-pill{font-size:11px;font-weight:700;padding:3px 8px;border-radius:8px;}
+  .opp-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0 3px 12px;font-size:12.5px;}
+  .opp-row .opp-name{color:var(--muted);}
+  .status-pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px;white-space:nowrap;}
   .status-pill.active{background:#e3f3e8;color:var(--green);}
   .status-pill.locked{background:#fbe3e0;color:var(--red);}
 
@@ -304,10 +299,6 @@
     </div>
 
     <div class="card">
-      <div class="mult-display">
-        <div class="num" id="multNum">1</div>
-        <div class="lbl">Güncel Puan</div>
-      </div>
       <div class="unit-note" id="unitNote"></div>
 
       <div class="side-box A" id="sideABox"></div>
@@ -343,7 +334,7 @@
     </div>
     <div class="card">
       <h2 id="vidoCallTitle"></h2>
-      <div class="small-note">Her oyuncu için "Gördü" veya "Görmedi" işaretleyin. Görmeyen, bu puanla elden çıkar.</div>
+      <div class="small-note">Her rakip için "Gördü" veya "Görmedi" işaretleyin. Sadece bu ikilinin arasındaki puan değişir.</div>
       <div id="vidoRespWrap"></div>
       <button class="btn-main" id="confirmVidoBtn">Onayla</button>
     </div>
@@ -406,7 +397,6 @@ let STATE = {
 let currentScreen = "s1";
 let currentTableId = null;
 let setupPick = { seated: {A:null, B:null}, partners: {A:{}, B:{}} };
-let pendingVidoCallingSide = null;
 let pendingVidoCallerName = null;
 let sessionPlayerPick = {};
 let forcingNewSession = false;
@@ -436,6 +426,58 @@ function getSessionPlayerNames(){
 function formatSessionName(d){
   const aylar = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
   return `${d.getDate()} ${aylar[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+/* ===================== KİŞİ-KİŞİ VİDO YARDIMCILARI =====================
+   Her ikili (A tarafından biri × B tarafından biri) kendi bağımsız vido
+   sayacına sahiptir. Değer = 2^sayac. Biri vido çekip karşısındaki görürse
+   SADECE o ikilinin sayacı artar, başka kimse etkilenmez. Görmezse o ikili
+   o anki değerle kapanır (kalıcı sonuç). Oturan-oturan ikilisi kapanırsa
+   (yani fiilen oynayan taraflardan biri vidoyu görmezse) el biter. */
+function sideOf(t, name){
+  if (t.seated.A === name) return "A";
+  if (t.seated.B === name) return "B";
+  if ((t.partners.A||{})[name]) return "A";
+  if ((t.partners.B||{})[name]) return "B";
+  return null;
+}
+function sideNames(t, side){
+  return [t.seated[side], ...Object.keys((t.partners&&t.partners[side])||{})];
+}
+function getPairCell(t, name1, name2){
+  const s1 = sideOf(t, name1);
+  const aName = s1 === "A" ? name1 : name2;
+  const bName = s1 === "A" ? name2 : name1;
+  return { aName, bName, p: (t.game.pairs[aName]||{})[bName] };
+}
+function callableTargets(t, name){
+  const side = sideOf(t, name);
+  const g = t.game;
+  const targets = [];
+  if (side === "A"){
+    Object.entries(g.pairs[name]||{}).forEach(([b,p])=>{
+      if (!p.closed && p.blockedCaller !== name) targets.push(b);
+    });
+  } else if (side === "B"){
+    sideNames(t,"A").forEach(a=>{
+      const p = (g.pairs[a]||{})[name];
+      if (p && !p.closed && p.blockedCaller !== name) targets.push(a);
+    });
+  }
+  return targets;
+}
+function buildInitialGame(seated, partners){
+  const fakeT = { seated, partners };
+  const aNames = sideNames(fakeT, "A");
+  const bNames = sideNames(fakeT, "B");
+  const pairs = {};
+  aNames.forEach(a=>{
+    pairs[a] = {};
+    bNames.forEach(b=>{
+      pairs[a][b] = { count:0, closed:false, blockedCaller:null };
+    });
+  });
+  return { finished:false, pairs, vidoLog:[] };
 }
 
 /* ===================== NAV ===================== */
@@ -685,29 +727,9 @@ document.getElementById("startGameBtn").addEventListener("click", ()=>{
   const seated = { A: setupPick.seated.A, B: setupPick.seated.B };
   const partners = { A: setupPick.partners.A, B: setupPick.partners.B };
   const game = buildInitialGame(seated, partners);
-  // Koltuk/ortak bilgisi ve oyun nesnesi TEK seferde yazılır (yarış durumu olmasın diye
-  // önceki sürümdeki setTimeout ile ayrı yazma kaldırıldı).
   fbUpdate(`${tablesPath()}/${currentTableId}`, { seated, partners, game });
   goScreen("s4", currentTableId);
 });
-
-function buildInitialGame(seated, partners){
-  const participants = side => {
-    const obj = { seated: {active:true, lockedAt:null} };
-    obj.partners = {};
-    Object.keys((partners&&partners[side])||{}).forEach(name=>{
-      obj.partners[name] = {active:true, lockedAt:null};
-    });
-    return obj;
-  };
-  return {
-    multiplier: 1,
-    finished: false,
-    blockedCallers: {},
-    vidoLog: [],
-    status: { A: participants("A"), B: participants("B") }
-  };
-}
 
 function startGameForTable(id){
   const t = STATE.tables[id];
@@ -732,7 +754,6 @@ function renderGameScreen(){
   if (!t || !t.game) { goScreen("s2"); return; }
   const g = t.game;
   document.getElementById("gameTableName").textContent = t.name;
-  document.getElementById("multNum").textContent = g.multiplier;
 
   const unit = STATE.settings.unitAmount || 0;
   const unitNote = document.getElementById("unitNote");
@@ -759,9 +780,10 @@ function renderGameScreen(){
   if (g.vidoLog && g.vidoLog.length){
     logCard.style.display = "block";
     logWrap.innerHTML = g.vidoLog.map(v=>{
-      const declined = v.declined && v.declined.length ? ` — Görmedi: ${v.declined.join(", ")}` : "";
-      const caller = v.by || (v.side==='A'?t.seated.A:t.seated.B);
-      return `<div class="vido-log-row">${escapeHtml(caller)} çekti (${v.from}→${v.to})${escapeHtml(declined)}</div>`;
+      const txt = v.saw
+        ? `gördü (x${Math.pow(2,v.from)} → x${Math.pow(2,v.from+1)})`
+        : `görmedi — x${Math.pow(2,v.from)} üzerinden kapandı`;
+      return `<div class="vido-log-row">${escapeHtml(v.caller)} → ${escapeHtml(v.opponent)}: ${txt}</div>`;
     }).join("");
   } else {
     logCard.style.display = "none";
@@ -770,80 +792,65 @@ function renderGameScreen(){
 
 function renderSideBox(side, t){
   const g = t.game;
-  const seatedName = t.seated[side];
-  const st = g.status[side];
+  const otherSide = side === "A" ? "B" : "A";
+  const names = sideNames(t, side);
+  const oppNames = sideNames(t, otherSide);
   const box = document.getElementById(`side${side}Box`);
   let html = `<div class="s-title">${side} TARAFI</div>`;
-  html += rowHtml(seatedName, "Oturan", st.seated.active, st.seated.lockedAt);
-  Object.entries(st.partners||{}).forEach(([name, p])=>{
-    html += rowHtml(name, "Ortak", p.active, p.lockedAt);
+  names.forEach(name=>{
+    const tag = name === t.seated[side] ? "Oturan" : "Ortak";
+    html += `<div class="person-block"><div class="p-row"><span class="pname">${escapeHtml(name)}</span><span class="ptag">${tag}</span></div>`;
+    oppNames.forEach(opp=>{
+      const { p } = getPairCell(t, name, opp);
+      if (!p) return;
+      const pill = p.closed
+        ? `<span class="status-pill locked">KAPANDI x${Math.pow(2,p.closedAtCount)}</span>`
+        : `<span class="status-pill active">x${Math.pow(2,p.count)}</span>`;
+      html += `<div class="opp-row"><span class="opp-name">↔ ${escapeHtml(opp)}</span>${pill}</div>`;
+    });
+    html += `</div>`;
   });
   box.innerHTML = html;
 }
-function rowHtml(name, tag, active, lockedAt){
-  const pill = active
-    ? `<span class="status-pill active">OYUNDA</span>`
-    : `<span class="status-pill locked">KİLİTLİ (${lockedAt})</span>`;
-  return `<div class="p-row"><span class="pname">${escapeHtml(name)} <span class="ptag">${tag}</span></span>${pill}</div>`;
-}
 
-/* Vido çağıracak oyuncuyu seçme - herkes (oturan + ortak) bağımsız çekebilir.
-   Sadece az önce KENDİSİ çeken kişi, karşı taraf çekip kendisi görene kadar
-   tekrar çekemez. Aynı taraftaki diğer kişiler bundan etkilenmez. */
+/* Vido çağıracak oyuncuyu seçme - herkes, kendi açık/bloke-olmayan
+   ikilileri olduğu sürece bağımsız çekebilir. */
 function renderVidoCallPicker(t, g){
   const wrap = document.getElementById("vidoCallWrap");
   wrap.innerHTML = "";
-  const blocked = g.blockedCallers || {};
   ["A","B"].forEach(side=>{
-    const st = g.status[side];
-    const people = [];
-    if (st.seated.active) people.push(t.seated[side]);
-    Object.entries(st.partners||{}).forEach(([n,p])=>{ if (p.active) people.push(n); });
-    people.forEach(name=>{
+    sideNames(t, side).forEach(name=>{
+      const targets = callableTargets(t, name);
       const btn = document.createElement("button");
       btn.className = "pick " + (side==="A" ? "sel-a" : "sel-b");
       btn.textContent = `🎲 ${name}`;
-      btn.disabled = !!blocked[name];
+      btn.disabled = targets.length === 0;
       wrap.appendChild(btn);
-      if (blocked[name]) return;
+      if (targets.length === 0) return;
       btn.addEventListener("click", ()=>{
-        pendingVidoCallingSide = side;
         pendingVidoCallerName = name;
         openVidoResponseScreen();
       });
     });
   });
-  const blockedNames = Object.keys(blocked).filter(n=>blocked[n]);
-  if (blockedNames.length){
-    const note = document.createElement("div");
-    note.className = "small-note";
-    note.style.width = "100%";
-    note.textContent = `${blockedNames.join(", ")} karşı taraf çekip kendisi görene kadar tekrar çekemez.`;
-    wrap.appendChild(note);
-  }
 }
 
 function openVidoResponseScreen(){
   const t = STATE.tables[currentTableId];
-  const g = t.game;
-  const callingSide = pendingVidoCallingSide;
-  const oppSide = callingSide === "A" ? "B" : "A";
-  document.getElementById("vidoCallTitle").textContent =
-    `${pendingVidoCallerName} vido çekti (${g.multiplier} → ${g.multiplier*2})`;
+  const caller = pendingVidoCallerName;
+  const targets = callableTargets(t, caller);
+  document.getElementById("vidoCallTitle").textContent = `${caller} vido çekti`;
 
   const wrap = document.getElementById("vidoRespWrap");
   wrap.innerHTML = "";
-  const st = g.status[oppSide];
-  const entries = [["seated", t.seated[oppSide], st.seated]];
-  Object.entries(st.partners||{}).forEach(([name,p])=> entries.push(["partner", name, p]));
-
-  entries.forEach(([kind, name, p])=>{
-    if (!p.active) return;
+  targets.forEach(oppName=>{
+    const { p } = getPairCell(t, caller, oppName);
+    const curVal = Math.pow(2, p.count);
     const row = document.createElement("div");
     row.className = "vido-resp-row";
     row.innerHTML = `
-      <span class="pname">${escapeHtml(name)}</span>
-      <div class="toggle-group" data-name="${escapeHtml(name)}">
+      <span class="pname">${escapeHtml(oppName)} <span class="ptag">(şu an x${curVal})</span></span>
+      <div class="toggle-group" data-name="${escapeHtml(oppName)}">
         <button type="button" class="toggle-btn gor on">Gördü</button>
         <button type="button" class="toggle-btn yok">Görmedi</button>
       </div>
@@ -862,55 +869,41 @@ document.getElementById("confirmVidoBtn").addEventListener("click", ()=>{
   try{
     const t = STATE.tables[currentTableId];
     const g = t.game;
-    const callingSide = pendingVidoCallingSide;
-    const callerName = pendingVidoCallerName;
-    const oppSide = callingSide === "A" ? "B" : "A";
-    const oldMult = g.multiplier;
-    const newMult = oldMult * 2;
+    const caller = pendingVidoCallerName;
+    const targets = callableTargets(t, caller);
 
     const responses = {};
     document.querySelectorAll("#vidoRespWrap .toggle-group").forEach(grp=>{
       const name = grp.getAttribute("data-name");
-      const sawIt = grp.querySelector(".gor").classList.contains("on");
-      responses[name] = sawIt;
+      responses[name] = grp.querySelector(".gor").classList.contains("on");
     });
-
-    g.blockedCallers = g.blockedCallers || {};
-
-    const st = g.status[oppSide];
-    const declined = [];
-    const accepted = [];
-    if (st.seated.active){
-      if (responses[t.seated[oppSide]] === false){
-        st.seated.active = false; st.seated.lockedAt = oldMult; declined.push(t.seated[oppSide]);
-      } else {
-        accepted.push(t.seated[oppSide]);
-      }
-    }
-    Object.keys(st.partners||{}).forEach(name=>{
-      const p = st.partners[name];
-      if (p.active){
-        if (responses[name] === false){
-          p.active = false; p.lockedAt = oldMult; declined.push(name);
-        } else {
-          accepted.push(name);
-        }
-      }
-    });
-
-    // Çağıran kişi artık (karşı taraf çekip kendisi görene kadar) tekrar çekemez.
-    g.blockedCallers[callerName] = true;
-    // Bu vidoyu gören (kabul eden) kişilerin önceki kilidi kalkar.
-    accepted.forEach(name=>{ delete g.blockedCallers[name]; });
 
     g.vidoLog = g.vidoLog || [];
-    g.vidoLog.push({ side: callingSide, by: callerName, from: oldMult, to: newMult, declined });
+    let handJustFinished = false;
+    let finishWinnerSide = null;
 
-    const oppActive = st.seated.active || Object.values(st.partners||{}).some(p=>p.active);
-    if (!oppActive){
-      finishGame(currentTableId, callingSide, oldMult, g);
+    targets.forEach(oppName=>{
+      const { aName, bName, p } = getPairCell(t, caller, oppName);
+      const oldCount = p.count;
+      const saw = responses[oppName] !== false;
+      if (saw){
+        p.count = oldCount + 1;
+        p.blockedCaller = caller;
+      } else {
+        p.closed = true;
+        p.closedLoser = oppName;
+        p.closedAtCount = oldCount;
+        if (aName === t.seated.A && bName === t.seated.B){
+          handJustFinished = true;
+          finishWinnerSide = sideOf(t, caller);
+        }
+      }
+      g.vidoLog.push({ caller, opponent: oppName, from: oldCount, saw });
+    });
+
+    if (handJustFinished){
+      finishHand(currentTableId, finishWinnerSide, g);
     } else {
-      g.multiplier = newMult;
       fbSet(`${tablesPath()}/${currentTableId}/game`, g);
     }
     goScreen("s4");
@@ -924,7 +917,7 @@ document.getElementById("aWinsBtn").addEventListener("click", ()=>{
   try{
     const t = STATE.tables[currentTableId];
     if (!t || !t.game){ alert("Oyun verisi henüz yüklenmedi, lütfen tekrar deneyin."); return; }
-    finishGame(currentTableId, "A", t.game.multiplier, t.game);
+    finishHand(currentTableId, "A", t.game);
   } catch(e){
     console.error(e);
     alert("El kapatılırken bir hata oluştu: " + e.message);
@@ -934,90 +927,53 @@ document.getElementById("bWinsBtn").addEventListener("click", ()=>{
   try{
     const t = STATE.tables[currentTableId];
     if (!t || !t.game){ alert("Oyun verisi henüz yüklenmedi, lütfen tekrar deneyin."); return; }
-    finishGame(currentTableId, "B", t.game.multiplier, t.game);
+    finishHand(currentTableId, "B", t.game);
   } catch(e){
     console.error(e);
     alert("El kapatılırken bir hata oluştu: " + e.message);
   }
 });
 
-/* ===================== İKİLİ (KİŞİ-KİŞİ) HESAPLAŞMA MOTORU =====================
-   Her vido reddinde, reddeden kişi o anki puan üzerinden KARŞI TARAFTA O ANDA
-   AKTİF olan herkese tek tek kaybeder. El sonunda, hâlâ aktif olan herkes
-   karşı tarafta hâlâ aktif olan herkese (son puan üzerinden) tek tek
-   kazanır/kaybeder. Böylece her parayı kazanan/kaybeden net bir karşı taraf
-   bulunur (sıfır toplam). */
-function computeSettlements(t, winnerSide, finalMultiplier){
-  const roster = { A: [], B: [] };
-  roster.A.push(t.seated.A);
-  Object.keys((t.partners&&t.partners.A)||{}).forEach(n=>roster.A.push(n));
-  roster.B.push(t.seated.B);
-  Object.keys((t.partners&&t.partners.B)||{}).forEach(n=>roster.B.push(n));
-
-  const active = { A: new Set(roster.A), B: new Set(roster.B) };
-  const pair = {};
-  function ensure(name){ if(!pair[name]) pair[name]={}; }
-  function settle(loserNames, winnerNames, mult){
-    loserNames.forEach(ln=>{
-      winnerNames.forEach(wn=>{
-        ensure(ln); ensure(wn);
-        pair[ln][wn] = (pair[ln][wn]||0) - mult;
-        pair[wn][ln] = (pair[wn][ln]||0) + mult;
-      });
-    });
-  }
-
-  (t.game.vidoLog||[]).forEach(ev=>{
-    const oppSide = ev.side === "A" ? "B" : "A";
-    const declined = ev.declined||[];
-    if (declined.length){
-      const stillActiveCallSide = [...active[ev.side]];
-      settle(declined, stillActiveCallSide, ev.from);
-      declined.forEach(n=> active[oppSide].delete(n));
-    }
-  });
-
-  const loserSide = winnerSide === "A" ? "B" : "A";
-  const finalLosers = [...active[loserSide]];
-  const finalWinners = [...active[winnerSide]];
-  if (finalLosers.length && finalWinners.length){
-    settle(finalLosers, finalWinners, finalMultiplier);
-  }
-  return pair;
-}
-
-function buildResultsFromPairwise(pair, unit){
-  const results = {};
-  Object.entries(pair).forEach(([name, oppMap])=>{
-    const vs = {};
-    let total = 0;
-    Object.entries(oppMap).forEach(([opp, multUnits])=>{
-      const amt = multUnits * unit;
-      vs[opp] = amt;
-      total += amt;
-    });
-    results[name] = { vs, total };
-  });
-  return results;
-}
-
-function finishGame(tableId, winnerSide, finalMultiplier, g){
+/* ===================== EL SONUCU HESAPLAMA =====================
+   Her ikili kendi son durumuna göre kapatılır:
+   - Daha önce biri "görmedi" deyip kapanmışsa: o sabit değerle kaybeder.
+   - Hâlâ açıksa: el kazananına göre, o ikilinin GÜNCEL puanıyla kapanır. */
+function finishHand(tableId, winnerSide, g){
   const t = STATE.tables[tableId];
   if (!t || !t.seated || !t.seated.A || !t.seated.B){
     throw new Error("Masa verisi eksik (oturanlar bulunamadı).");
   }
   const unit = STATE.settings.unitAmount || 0;
-  const pair = computeSettlements(t, winnerSide, finalMultiplier);
-  const results = buildResultsFromPairwise(pair, unit);
+  const results = {};
+  function ensure(n){ if(!results[n]) results[n] = { vs:{}, total:0 }; }
+  function addSettle(loser, winner, amount){
+    ensure(loser); ensure(winner);
+    results[loser].vs[winner] = (results[loser].vs[winner]||0) - amount;
+    results[loser].total -= amount;
+    results[winner].vs[loser] = (results[winner].vs[loser]||0) + amount;
+    results[winner].total += amount;
+  }
+  Object.entries(g.pairs).forEach(([aName, oppMap])=>{
+    Object.entries(oppMap).forEach(([bName, p])=>{
+      if (p.closed){
+        const loser = p.closedLoser;
+        const winner = loser === aName ? bName : aName;
+        addSettle(loser, winner, Math.pow(2, p.closedAtCount) * unit);
+      } else {
+        const winner = winnerSide === "A" ? aName : bName;
+        const loser = winnerSide === "A" ? bName : aName;
+        addSettle(loser, winner, Math.pow(2, p.count) * unit);
+      }
+    });
+  });
 
   g.finished = true;
-  g.finalMultiplier = finalMultiplier;
   g.winner = winnerSide;
   g.results = results;
 
   const gameNo = Object.keys(t.history||{}).length + 1;
   fbPush(`${tablesPath()}/${tableId}/history`, {
-    gameNo, finalMultiplier, winner: winnerSide, results, time: Date.now()
+    gameNo, winner: winnerSide, results, time: Date.now()
   });
   fbSet(`${tablesPath()}/${tableId}/game`, g);
 }
@@ -1026,7 +982,7 @@ function renderFinishedResults(t){
   const g = t.game;
   const wrap = document.getElementById("finishedResults");
   wrap.innerHTML = Object.entries(g.results||{}).map(([name,r])=>{
-    const total = r.total !== undefined ? r.total : (r.amount||0);
+    const total = r.total !== undefined ? r.total : 0;
     const cls = total >= 0 ? "pos" : "neg";
     const sign = total >= 0 ? "+" : "";
     const vsTxt = r.vs ? Object.entries(r.vs).map(([opp,amt])=>`${opp} ${amt>=0?'+':''}${amt.toFixed(0)}`).join(" · ") : "";
@@ -1076,7 +1032,7 @@ function renderTotalsScreen(){
   const totals = {};
   rows.forEach(h=>{
     Object.entries(h.results||{}).forEach(([name,r])=>{
-      const val = (r && typeof r === "object") ? (r.total !== undefined ? r.total : (r.amount||0)) : (r||0);
+      const val = (r && typeof r === "object") ? (r.total||0) : (r||0);
       totals[name] = (totals[name]||0) + val;
     });
   });
@@ -1096,7 +1052,7 @@ function renderTotalsScreen(){
   } else {
     rows.forEach(h=>{
       const resStr = Object.entries(h.results||{}).map(([n,r])=>{
-        const val = (r && typeof r === "object") ? (r.total !== undefined ? r.total : (r.amount||0)) : (r||0);
+        const val = (r && typeof r === "object") ? (r.total||0) : (r||0);
         return `${n}: ${val>=0?'+':''}${val.toFixed(0)}`;
       }).join(" · ");
       const div = document.createElement("div");
@@ -1104,7 +1060,7 @@ function renderTotalsScreen(){
       div.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
           <div>
-            <b>${escapeHtml(h.tname)}</b> · El ${h.gameNo} · ${h.winner} kazandı (x${h.finalMultiplier})
+            <b>${escapeHtml(h.tname)}</b> · El ${h.gameNo} · ${h.winner} kazandı
             <br><span class="small-note">${escapeHtml(resStr)}</span>
           </div>
           <button class="btn-danger btn-sm" style="flex:0 0 auto;">Sil</button>
