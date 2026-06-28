@@ -188,10 +188,11 @@
   .toggle-btn.gor.on{background:#e3f3e8;border-color:var(--green);color:var(--green);}
   .toggle-btn.yok.on{background:#fbe3e0;border-color:var(--red);color:var(--red);}
 
-  .result-line{display:flex;justify-content:space-between;font-size:14px;padding:5px 0;border-top:1px solid var(--line);}
+  .result-line{display:flex;justify-content:space-between;align-items:flex-start;font-size:14px;padding:7px 0;border-top:1px solid var(--line);gap:8px;}
   .result-line:first-child{border-top:none;}
-  .result-line .amt.pos{color:var(--green);font-weight:800;}
-  .result-line .amt.neg{color:var(--red);font-weight:800;}
+  .result-line .amt.pos{color:var(--green);font-weight:800;white-space:nowrap;}
+  .result-line .amt.neg{color:var(--red);font-weight:800;white-space:nowrap;}
+  .vs-breakdown{font-size:11px;color:var(--muted);margin-top:2px;}
 
   .tabbar{
     position:fixed;bottom:0;left:0;right:0;
@@ -208,7 +209,7 @@
   .top-actions{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;}
   .back-link{color:#cfe8da;font-size:13px;font-weight:700;background:none;border:none;padding:4px 0;}
   .small-note{font-size:12px;color:var(--muted);margin-top:6px;}
-  .history-item{border-top:1px solid var(--line);padding:8px 0;font-size:13px;}
+  .history-item{border-top:1px solid var(--line);padding:9px 0;font-size:13px;}
   .history-item:first-child{border-top:none;}
   .vido-log-row{font-size:12px;color:var(--muted);padding:3px 0;}
   .total-row{display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--line);font-size:15px;}
@@ -313,11 +314,9 @@
       <div class="side-box B" id="sideBBox"></div>
 
       <div id="liveControls">
-        <div class="row">
-          <button class="btn-soft" id="vidoABtn"></button>
-          <button class="btn-soft" id="vidoBBtn"></button>
-        </div>
-        <div class="row" style="margin-top:8px;">
+        <div class="small-note" style="margin-bottom:2px;">Vido çekecek oyuncuya dokunun:</div>
+        <div class="player-pick" id="vidoCallWrap"></div>
+        <div class="row" style="margin-top:16px;">
           <button class="btn-main" id="aWinsBtn">A Kazandı</button>
           <button class="btn-main" id="bWinsBtn">B Kazandı</button>
         </div>
@@ -383,8 +382,6 @@
 
 <script>
 /* ===================== FIREBASE CONFIG ===================== */
-/* Aynı Firebase projesi (pisti-2f056) kullanılıyor, farklı bir
-   kök yol (tavla/) altında - Pişti verisiyle çakışmaz. */
 const firebaseConfig = {
   apiKey: "AIzaSyDr7hCb8U4G4lw4brY1EClyO3yckGoKdWc",
   authDomain: "pisti-2f056.firebaseapp.com",
@@ -400,18 +397,19 @@ const ROOT = db.ref("tavla");
 
 /* ===================== LOCAL STATE ===================== */
 let STATE = {
-  players: {},        // id -> name  (master roster, persists)
+  players: {},
   settings: { unitAmount: 0 },
-  sessions: {},        // sessionId -> {name, createdAt, activePlayers:{name:true}, tables:{...}}
+  sessions: {},
   activeSessionId: null,
-  tables: {}           // derived: current active session's tables
+  tables: {}
 };
 let currentScreen = "s1";
 let currentTableId = null;
 let setupPick = { seated: {A:null, B:null}, partners: {A:{}, B:{}} };
 let pendingVidoCallingSide = null;
-let sessionPlayerPick = {};      // name -> true, used while setting up a new session
-let forcingNewSession = false;   // local override to show session-setup view
+let pendingVidoCallerName = null;
+let sessionPlayerPick = {};
+let forcingNewSession = false;
 let totalsSelectedSession = null;
 
 /* ===================== FIREBASE SYNC ===================== */
@@ -568,7 +566,7 @@ document.getElementById("newTableBtn").addEventListener("click", ()=>{
     seated: {A:null, B:null},
     partners: {A:{}, B:{}},
     game: null,
-    history: []
+    history: {}
   });
   setupPick = { seated:{A:null,B:null}, partners:{A:{},B:{}} };
   goScreen("s3", ref.key);
@@ -745,16 +743,7 @@ function renderGameScreen(){
   document.getElementById("liveControls").style.display = finished ? "none" : "block";
   document.getElementById("finishedPanel").style.display = finished ? "block" : "none";
 
-  if (!finished){
-    const vidoABtn = document.getElementById("vidoABtn");
-    const vidoBBtn = document.getElementById("vidoBBtn");
-    vidoABtn.textContent = `🎲 ${t.seated.A} Çekti`;
-    vidoBBtn.textContent = `🎲 ${t.seated.B} Çekti`;
-    const canCall = g.canCall || null;
-    vidoABtn.disabled = (canCall === "B");
-    vidoBBtn.disabled = (canCall === "A");
-  }
-
+  if (!finished) renderVidoCallPicker(t, g);
   if (finished) renderFinishedResults(t);
 
   const logWrap = document.getElementById("vidoLogWrap");
@@ -763,7 +752,8 @@ function renderGameScreen(){
     logCard.style.display = "block";
     logWrap.innerHTML = g.vidoLog.map(v=>{
       const declined = v.declined && v.declined.length ? ` — Görmedi: ${v.declined.join(", ")}` : "";
-      return `<div class="vido-log-row">${v.side==='A'?t.seated.A:t.seated.B} çekti (${v.from}→${v.to})${declined}</div>`;
+      const caller = v.by || (v.side==='A'?t.seated.A:t.seated.B);
+      return `<div class="vido-log-row">${escapeHtml(caller)} çekti (${v.from}→${v.to})${escapeHtml(declined)}</div>`;
     }).join("");
   } else {
     logCard.style.display = "none";
@@ -789,23 +779,46 @@ function rowHtml(name, tag, active, lockedAt){
   return `<div class="p-row"><span class="pname">${escapeHtml(name)} <span class="ptag">${tag}</span></span>${pill}</div>`;
 }
 
-document.getElementById("vidoABtn").addEventListener("click", ()=>{
-  pendingVidoCallingSide = "A";
-  openVidoResponseScreen();
-});
-document.getElementById("vidoBBtn").addEventListener("click", ()=>{
-  pendingVidoCallingSide = "B";
-  openVidoResponseScreen();
-});
+/* Vido çağıracak oyuncuyu seçme - artık herkes (oturan + ortak) çekebilir */
+function renderVidoCallPicker(t, g){
+  const wrap = document.getElementById("vidoCallWrap");
+  wrap.innerHTML = "";
+  const canCall = g.canCall || null;
+  ["A","B"].forEach(side=>{
+    const sideBlocked = canCall && canCall !== side;
+    const st = g.status[side];
+    const people = [];
+    if (st.seated.active) people.push(t.seated[side]);
+    Object.entries(st.partners||{}).forEach(([n,p])=>{ if (p.active) people.push(n); });
+    people.forEach(name=>{
+      const btn = document.createElement("button");
+      btn.className = "pick " + (side==="A" ? "sel-a" : "sel-b");
+      btn.textContent = `🎲 ${name}`;
+      btn.disabled = sideBlocked;
+      btn.addEventListener("click", ()=>{
+        pendingVidoCallingSide = side;
+        pendingVidoCallerName = name;
+        openVidoResponseScreen();
+      });
+      wrap.appendChild(btn);
+    });
+  });
+  if (canCall){
+    const note = document.createElement("div");
+    note.className = "small-note";
+    note.style.width = "100%";
+    note.textContent = `Sıra ${canCall} tarafında — karşı taraf görmeden diğer taraf tekrar çekemez.`;
+    wrap.appendChild(note);
+  }
+}
 
 function openVidoResponseScreen(){
   const t = STATE.tables[currentTableId];
   const g = t.game;
   const callingSide = pendingVidoCallingSide;
   const oppSide = callingSide === "A" ? "B" : "A";
-  const callerName = t.seated[callingSide];
   document.getElementById("vidoCallTitle").textContent =
-    `${callerName} vido çekti (${g.multiplier} → ${g.multiplier*2})`;
+    `${pendingVidoCallerName} vido çekti (${g.multiplier} → ${g.multiplier*2})`;
 
   const wrap = document.getElementById("vidoRespWrap");
   wrap.innerHTML = "";
@@ -864,14 +877,14 @@ document.getElementById("confirmVidoBtn").addEventListener("click", ()=>{
   });
 
   g.vidoLog = g.vidoLog || [];
-  g.vidoLog.push({ side: callingSide, from: oldMult, to: newMult, declined });
+  g.vidoLog.push({ side: callingSide, by: pendingVidoCallerName, from: oldMult, to: newMult, declined });
 
   const oppActive = st.seated.active || Object.values(st.partners||{}).some(p=>p.active);
   if (!oppActive){
     finishGame(currentTableId, callingSide, oldMult, g);
   } else {
     g.multiplier = newMult;
-    g.canCall = oppSide; // taraf üst üste çekemez; sıra karşı tarafa geçti
+    g.canCall = oppSide;
     fbSet(`${tablesPath()}/${currentTableId}/game`, g);
   }
   goScreen("s4");
@@ -886,52 +899,96 @@ document.getElementById("bWinsBtn").addEventListener("click", ()=>{
   finishGame(currentTableId, "B", t.game.multiplier, t.game);
 });
 
+/* ===================== İKİLİ (KİŞİ-KİŞİ) HESAPLAŞMA MOTORU =====================
+   Her vido reddinde, reddeden kişi o anki puan üzerinden KARŞI TARAFTA O ANDA
+   AKTİF olan herkese tek tek kaybeder. El sonunda, hâlâ aktif olan herkes
+   karşı tarafta hâlâ aktif olan herkese (son puan üzerinden) tek tek
+   kazanır/kaybeder. Böylece her parayı kazanan/kaybeden net bir karşı taraf
+   bulunur (sıfır toplam). */
+function computeSettlements(t, winnerSide, finalMultiplier){
+  const roster = { A: [], B: [] };
+  roster.A.push(t.seated.A);
+  Object.keys((t.partners&&t.partners.A)||{}).forEach(n=>roster.A.push(n));
+  roster.B.push(t.seated.B);
+  Object.keys((t.partners&&t.partners.B)||{}).forEach(n=>roster.B.push(n));
+
+  const active = { A: new Set(roster.A), B: new Set(roster.B) };
+  const pair = {};
+  function ensure(name){ if(!pair[name]) pair[name]={}; }
+  function settle(loserNames, winnerNames, mult){
+    loserNames.forEach(ln=>{
+      winnerNames.forEach(wn=>{
+        ensure(ln); ensure(wn);
+        pair[ln][wn] = (pair[ln][wn]||0) - mult;
+        pair[wn][ln] = (pair[wn][ln]||0) + mult;
+      });
+    });
+  }
+
+  (t.game.vidoLog||[]).forEach(ev=>{
+    const oppSide = ev.side === "A" ? "B" : "A";
+    const declined = ev.declined||[];
+    if (declined.length){
+      const stillActiveCallSide = [...active[ev.side]];
+      settle(declined, stillActiveCallSide, ev.from);
+      declined.forEach(n=> active[oppSide].delete(n));
+    }
+  });
+
+  const loserSide = winnerSide === "A" ? "B" : "A";
+  const finalLosers = [...active[loserSide]];
+  const finalWinners = [...active[winnerSide]];
+  if (finalLosers.length && finalWinners.length){
+    settle(finalLosers, finalWinners, finalMultiplier);
+  }
+  return pair;
+}
+
+function buildResultsFromPairwise(pair, unit){
+  const results = {};
+  Object.entries(pair).forEach(([name, oppMap])=>{
+    const vs = {};
+    let total = 0;
+    Object.entries(oppMap).forEach(([opp, multUnits])=>{
+      const amt = multUnits * unit;
+      vs[opp] = amt;
+      total += amt;
+    });
+    results[name] = { vs, total };
+  });
+  return results;
+}
+
 function finishGame(tableId, winnerSide, finalMultiplier, g){
   const t = STATE.tables[tableId];
   const unit = STATE.settings.unitAmount || 0;
-  const results = {};
-
-  ["A","B"].forEach(side=>{
-    const st = g.status[side];
-    const seatedName = t.seated[side];
-    results[seatedName] = computeResult(st.seated, side, winnerSide, finalMultiplier, unit);
-    Object.entries(st.partners||{}).forEach(([name,p])=>{
-      results[name] = computeResult(p, side, winnerSide, finalMultiplier, unit);
-    });
-  });
+  const pair = computeSettlements(t, winnerSide, finalMultiplier);
+  const results = buildResultsFromPairwise(pair, unit);
 
   g.finished = true;
   g.finalMultiplier = finalMultiplier;
   g.winner = winnerSide;
   g.results = results;
 
-  const history = t.history ? t.history.slice() : [];
-  history.push({
-    gameNo: history.length+1,
-    finalMultiplier,
-    winner: winnerSide,
-    results,
-    time: Date.now()
+  const gameNo = Object.keys(t.history||{}).length + 1;
+  fbPush(`${tablesPath()}/${tableId}/history`, {
+    gameNo, finalMultiplier, winner: winnerSide, results, time: Date.now()
   });
-
-  fbUpdate(`${tablesPath()}/${tableId}`, { game: g, history });
-}
-
-function computeResult(p, side, winnerSide, finalMultiplier, unit){
-  if (!p.active){
-    return { side, status:"locked", lockedAt:p.lockedAt, amount: -(p.lockedAt*unit) };
-  }
-  const won = side === winnerSide;
-  return { side, status:"active", amount: (won?1:-1)*finalMultiplier*unit };
+  fbSet(`${tablesPath()}/${tableId}/game`, g);
 }
 
 function renderFinishedResults(t){
   const g = t.game;
   const wrap = document.getElementById("finishedResults");
   wrap.innerHTML = Object.entries(g.results||{}).map(([name,r])=>{
-    const cls = r.amount >= 0 ? "pos" : "neg";
-    const sign = r.amount >= 0 ? "+" : "";
-    return `<div class="result-line"><span>${escapeHtml(name)} ${r.status==='locked'?`(kilitli ${r.lockedAt})`:''}</span><span class="amt ${cls}">${sign}${r.amount.toFixed(2)} ₺</span></div>`;
+    const total = r.total !== undefined ? r.total : (r.amount||0);
+    const cls = total >= 0 ? "pos" : "neg";
+    const sign = total >= 0 ? "+" : "";
+    const vsTxt = r.vs ? Object.entries(r.vs).map(([opp,amt])=>`${opp} ${amt>=0?'+':''}${amt.toFixed(0)}`).join(" · ") : "";
+    return `<div class="result-line">
+        <div><span class="pname">${escapeHtml(name)}</span>${vsTxt?`<div class="vs-breakdown">${escapeHtml(vsTxt)}</div>`:''}</div>
+        <span class="amt ${cls}">${sign}${total.toFixed(2)} ₺</span>
+      </div>`;
   }).join("");
 }
 
@@ -956,20 +1013,26 @@ function renderTotalsScreen(){
   if ([...sel.options].some(o=>o.value===totalsSelectedSession)) sel.value = totalsSelectedSession;
   else { totalsSelectedSession = "ALL"; sel.value = "ALL"; }
 
-  let tablesToScan = [];
+  let rows = [];
+  function collectFromSession(sid, s){
+    Object.entries(s.tables||{}).forEach(([tid,t])=>{
+      Object.entries(t.history||{}).forEach(([hid,h])=>{
+        rows.push({sessionId: sid, tableId: tid, historyId: hid, tname: t.name, ...h});
+      });
+    });
+  }
   if (totalsSelectedSession === "ALL"){
-    sessionEntries.forEach(([id,s])=> tablesToScan = tablesToScan.concat(Object.values(s.tables||{})));
+    sessionEntries.forEach(([id,s])=> collectFromSession(id, s));
   } else {
     const s = STATE.sessions[totalsSelectedSession];
-    tablesToScan = s ? Object.values(s.tables||{}) : [];
+    if (s) collectFromSession(totalsSelectedSession, s);
   }
 
   const totals = {};
-  tablesToScan.forEach(t=>{
-    (t.history||[]).forEach(h=>{
-      Object.entries(h.results||{}).forEach(([name,r])=>{
-        totals[name] = (totals[name]||0) + r.amount;
-      });
+  rows.forEach(h=>{
+    Object.entries(h.results||{}).forEach(([name,r])=>{
+      const val = (r && typeof r === "object") ? (r.total !== undefined ? r.total : (r.amount||0)) : (r||0);
+      totals[name] = (totals[name]||0) + val;
     });
   });
   const gw = document.getElementById("grandTotalsWrap");
@@ -981,17 +1044,34 @@ function renderTotalsScreen(){
   }).join("") : `<div class="small-note">Henüz tamamlanmış el yok.</div>`;
 
   const hw = document.getElementById("allHistoryWrap");
-  let rows = [];
-  tablesToScan.forEach(t=>{
-    (t.history||[]).forEach(h=>{
-      rows.push({tname:t.name, ...h});
+  rows.sort((a,b)=>(b.time||0)-(a.time||0));
+  hw.innerHTML = "";
+  if (!rows.length){
+    hw.innerHTML = `<div class="small-note">Henüz tamamlanmış el yok.</div>`;
+  } else {
+    rows.forEach(h=>{
+      const resStr = Object.entries(h.results||{}).map(([n,r])=>{
+        const val = (r && typeof r === "object") ? (r.total !== undefined ? r.total : (r.amount||0)) : (r||0);
+        return `${n}: ${val>=0?'+':''}${val.toFixed(0)}`;
+      }).join(" · ");
+      const div = document.createElement("div");
+      div.className = "history-item";
+      div.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+          <div>
+            <b>${escapeHtml(h.tname)}</b> · El ${h.gameNo} · ${h.winner} kazandı (x${h.finalMultiplier})
+            <br><span class="small-note">${escapeHtml(resStr)}</span>
+          </div>
+          <button class="btn-danger btn-sm" style="flex:0 0 auto;">Sil</button>
+        </div>`;
+      div.querySelector("button").addEventListener("click", ()=>{
+        if (confirm("Bu el silinsin mi? Toplamlardan da çıkarılacak.")){
+          fbRemove(`sessions/${h.sessionId}/tables/${h.tableId}/history/${h.historyId}`);
+        }
+      });
+      hw.appendChild(div);
     });
-  });
-  rows.sort((a,b)=>b.time-a.time);
-  hw.innerHTML = rows.length ? rows.map(h=>{
-    const resStr = Object.entries(h.results).map(([n,r])=>`${n}: ${r.amount>=0?'+':''}${r.amount.toFixed(0)}`).join(" · ");
-    return `<div class="history-item"><b>${escapeHtml(h.tname)}</b> · El ${h.gameNo} · ${h.winner} kazandı (x${h.finalMultiplier})<br><span class="small-note">${resStr}</span></div>`;
-  }).join("") : `<div class="small-note">Henüz tamamlanmış el yok.</div>`;
+  }
 }
 
 /* ===================== UTIL ===================== */
