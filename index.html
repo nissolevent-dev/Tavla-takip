@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tavla">
+<title>TAVLA - ORTAKLI TAKİP</title>
+<style>
+  :root{
+    --bg:#0b3d2e;
+    --bg2:#0f4d3a;
+    --card:#ffffff;
+    --card-soft:#f4f1ea;
+    --gold:#d4a44c;
+    --gold-dark:#b8862f;
+    --ink:#1c2b24;
+    --muted:#6b7a72;
+    --red:#c0392b;
+    --green:#1e8449;
+    --line:#e3ddd0;
+    --sideA:#1f6f8b;
+    --sideB:#a3492f;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink);}
+  body{
+    background:radial-gradient(circle at 50% 0%, var(--bg2), var(--bg) 70%);
+    min-height:100vh;
+    padding-bottom:40px;
+  }
+  header{
+    text-align:center;
+    padding:18px 12px 14px;
+    color:#fff;
+  }
+  header h1{
+    margin:0;
+    font-size:26px;
+    letter-spacing:2px;
+    color:var(--gold);
+    font-weight:800;
+    text-shadow:0 2px 4px rgba(0,0,0,.3);
+  }
+  header small{
+    display:block;
+    margin-top:2px;
+    color:#cfe8da;
+    letter-spacing:3px;
+    font-size:11px;
+  }
+  .wrap{max-width:520px;margin:0 auto;padding:0 14px;}
+  .screen{display:none;}
+  .screen.active{display:block;animation:fade .15s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+
+  .card{
+    background:var(--card);
+    border-radius:16px;
+    padding:16px;
+    margin-bottom:14px;
+    box-shadow:0 4px 14px rgba(0,0,0,.18);
+  }
+  .card h2{
+    margin:0 0 10px;
+    font-size:15px;
+    color:var(--gold-dark);
+    letter-spacing:.5px;
+    text-transform:uppercase;
+    font-weight:700;
+  }
+  label{font-size:12px;color:var(--muted);font-weight:600;display:block;margin:8px 0 4px;}
+  input[type=text],input[type=number]{
+    width:100%;
+    padding:11px 12px;
+    border-radius:10px;
+    border:1.5px solid var(--line);
+    font-size:16px;
+    background:var(--card-soft);
+    color:var(--ink);
+  }
+  input:focus{outline:none;border-color:var(--gold);}
+  .row{display:flex;gap:8px;}
+  .row > *{flex:1;}
+  button{
+    border:none;
+    border-radius:12px;
+    padding:12px 14px;
+    font-size:15px;
+    font-weight:700;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .btn-main{background:var(--gold);color:#2a1d05;width:100%;margin-top:10px;}
+  .btn-main:active{background:var(--gold-dark);}
+  .btn-soft{background:var(--card-soft);color:var(--ink);border:1.5px solid var(--line);}
+  .btn-danger{background:#fbe3e0;color:var(--red);}
+  .btn-ghost{background:transparent;color:var(--gold);text-decoration:underline;padding:6px;}
+  .btn-block{width:100%;margin-top:8px;}
+  .btn-sm{padding:7px 10px;font-size:13px;border-radius:9px;}
+
+  .chip-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;}
+  .chip{
+    background:var(--card-soft);
+    border:1.5px solid var(--line);
+    border-radius:20px;
+    padding:8px 13px;
+    font-size:14px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .chip button{background:none;border:none;color:var(--red);font-size:15px;padding:0;font-weight:900;}
+
+  .player-pick{
+    display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;
+  }
+  .pick{
+    padding:9px 13px;border-radius:20px;border:1.5px solid var(--line);
+    background:var(--card-soft);font-size:14px;font-weight:600;color:var(--ink);
+  }
+  .pick.sel-a{background:var(--sideA);color:#fff;border-color:var(--sideA);}
+  .pick.sel-b{background:var(--sideB);color:#fff;border-color:var(--sideB);}
+  .pick.disabled{opacity:.35;}
+
+  .table-card{
+    background:var(--card);
+    border-radius:16px;
+    padding:14px;
+    margin-bottom:12px;
+    box-shadow:0 4px 14px rgba(0,0,0,.18);
+  }
+  .table-card .t-head{display:flex;justify-content:space-between;align-items:center;}
+  .table-card .t-head .tname{font-weight:800;font-size:16px;}
+  .t-sub{font-size:13px;color:var(--muted);margin-top:4px;}
+  .badge{
+    display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:10px;
+    background:var(--card-soft);color:var(--muted);margin-left:6px;
+  }
+  .badge.live{background:#e3f3e8;color:var(--green);}
+
+  .mult-display{
+    text-align:center;
+    margin:6px 0 14px;
+  }
+  .mult-display .num{
+    font-size:54px;font-weight:900;color:var(--gold-dark);line-height:1;
+  }
+  .mult-display .lbl{font-size:12px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-top:2px;}
+
+  .side-box{
+    border-radius:14px;
+    padding:12px;
+    margin-bottom:10px;
+  }
+  .side-box.A{background:rgba(31,111,139,.08);border:1.5px solid rgba(31,111,139,.35);}
+  .side-box.B{background:rgba(163,73,47,.08);border:1.5px solid rgba(163,73,47,.35);}
+  .side-box .s-title{font-weight:800;font-size:13px;letter-spacing:1px;margin-bottom:8px;text-transform:uppercase;}
+  .side-box.A .s-title{color:var(--sideA);}
+  .side-box.B .s-title{color:var(--sideB);}
+  .p-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:14px;border-top:1px solid rgba(0,0,0,.06);}
+  .p-row:first-of-type{border-top:none;}
+  .p-row .pname{font-weight:600;}
+  .p-row .ptag{font-size:10px;color:var(--muted);font-weight:600;}
+  .status-pill{font-size:11px;font-weight:700;padding:3px 8px;border-radius:8px;}
+  .status-pill.active{background:#e3f3e8;color:var(--green);}
+  .status-pill.locked{background:#fbe3e0;color:var(--red);}
+
+  .vido-resp-row{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:10px 0;border-top:1px solid var(--line);
+  }
+  .vido-resp-row:first-child{border-top:none;}
+  .toggle-group{display:flex;gap:6px;}
+  .toggle-btn{
+    padding:8px 12px;border-radius:9px;border:1.5px solid var(--line);
+    background:var(--card-soft);font-size:13px;font-weight:700;color:var(--muted);
+  }
+  .toggle-btn.gor.on{background:#e3f3e8;border-color:var(--green);color:var(--green);}
+  .toggle-btn.yok.on{background:#fbe3e0;border-color:var(--red);color:var(--red);}
+
+  .result-line{display:flex;justify-content:space-between;font-size:14px;padding:5px 0;border-top:1px solid var(--line);}
+  .result-line:first-child{border-top:none;}
+  .result-line .amt.pos{color:var(--green);font-weight:800;}
+  .result-line .amt.neg{color:var(--red);font-weight:800;}
+
+  .tabbar{
+    position:fixed;bottom:0;left:0;right:0;
+    background:#fff;
+    display:flex;
+    box-shadow:0 -4px 14px rgba(0,0,0,.18);
+    z-index:50;
+  }
+  .tabbar button{
+    flex:1;border-radius:0;background:none;padding:12px 4px 10px;font-size:11px;font-weight:700;color:var(--muted);
+  }
+  .tabbar button.on{color:var(--gold-dark);}
+  .empty-msg{text-align:center;color:#cfe8da;font-size:13px;padding:30px 10px;}
+  .top-actions{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .back-link{color:#cfe8da;font-size:13px;font-weight:700;background:none;border:none;padding:4px 0;}
+  .small-note{font-size:12px;color:var(--muted);margin-top:6px;}
+  .history-item{border-top:1px solid var(--line);padding:8px 0;font-size:13px;}
+  .history-item:first-child{border-top:none;}
+  .vido-log-row{font-size:12px;color:var(--muted);padding:3px 0;}
+  .total-row{display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--line);font-size:15px;}
+  .total-row:first-child{border-top:none;}
+  .total-row .nm{font-weight:700;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>TAVLA</h1>
+  <small>ORTAKLI TAKİP</small>
+</header>
+
+<div class="wrap">
+
+  <!-- SCREEN 1: HOME / PLAYERS / SETTINGS -->
+  <div class="screen active" id="s1">
+    <div class="card">
+      <h2>Birim Tutar (₺)</h2>
+      <input type="number" id="unitAmountInput" placeholder="Örn: 10" inputmode="decimal">
+      <button class="btn-main" id="saveUnitBtn">Kaydet</button>
+    </div>
+
+    <div class="card">
+      <h2>Oyuncular</h2>
+      <div class="row">
+        <input type="text" id="newPlayerInput" placeholder="Oyuncu adı">
+        <button class="btn-soft" id="addPlayerBtn" style="flex:0 0 70px;">Ekle</button>
+      </div>
+      <div class="chip-list" id="playerChipList"></div>
+    </div>
+
+    <button class="btn-main" id="goTablesBtn">Masalara Git →</button>
+  </div>
+
+  <!-- SCREEN 2: TABLES LIST -->
+  <div class="screen" id="s2">
+    <div class="top-actions">
+      <button class="back-link" data-go="s1">← Oyuncular</button>
+      <button class="btn-soft btn-sm" id="newTableBtn">+ Yeni Masa</button>
+    </div>
+    <div id="tableListWrap"></div>
+    <div class="empty-msg" id="noTableMsg">Henüz masa yok. "+ Yeni Masa" ile başlayın.</div>
+  </div>
+
+  <!-- SCREEN 3: TABLE SETUP -->
+  <div class="screen" id="s3">
+    <div class="top-actions">
+      <button class="back-link" data-go="s2">← Masalar</button>
+      <span id="setupTableName" style="color:#fff;font-weight:800;"></span>
+    </div>
+
+    <div class="card">
+      <h2>Oturanlar (A / B)</h2>
+      <div class="small-note">Bir oyuncuya dokunarak A veya B tarafına atayın.</div>
+      <div class="player-pick" id="seatPickWrap"></div>
+    </div>
+
+    <div class="card">
+      <h2>A Tarafı Ortakları</h2>
+      <div class="player-pick" id="partnerAWrap"></div>
+    </div>
+
+    <div class="card">
+      <h2>B Tarafı Ortakları</h2>
+      <div class="player-pick" id="partnerBWrap"></div>
+    </div>
+
+    <button class="btn-main" id="startGameBtn">Eli Başlat</button>
+  </div>
+
+  <!-- SCREEN 4: GAME SCREEN -->
+  <div class="screen" id="s4">
+    <div class="top-actions">
+      <button class="back-link" data-go="s2">← Masalar</button>
+      <span id="gameTableName" style="color:#fff;font-weight:800;"></span>
+      <button class="back-link" id="editSeatsBtn">Düzenle</button>
+    </div>
+
+    <div class="card">
+      <div class="mult-display">
+        <div class="num" id="multNum">1</div>
+        <div class="lbl">Güncel Puan</div>
+      </div>
+
+      <div class="side-box A" id="sideABox"></div>
+      <div class="side-box B" id="sideBBox"></div>
+
+      <div id="liveControls">
+        <button class="btn-main" id="vidoBtn">🎲 Vido Çekildi</button>
+        <div class="row" style="margin-top:8px;">
+          <button class="btn-soft" id="aWinsBtn">A Kazandı</button>
+          <button class="btn-soft" id="bWinsBtn">B Kazandı</button>
+        </div>
+      </div>
+
+      <div id="finishedPanel" style="display:none;">
+        <h2 style="margin-top:14px;">El Sonucu</h2>
+        <div id="finishedResults"></div>
+        <button class="btn-main" id="nextHandBtn">Yeni El Başlat</button>
+      </div>
+    </div>
+
+    <div class="card" id="vidoLogCard" style="display:none;">
+      <h2>Vido Geçmişi (bu el)</h2>
+      <div id="vidoLogWrap"></div>
+    </div>
+  </div>
+
+  <!-- SCREEN 5: VIDO RESPONSE -->
+  <div class="screen" id="s5">
+    <div class="top-actions">
+      <button class="back-link" data-go="s4">← Vazgeç</button>
+      <span style="color:#fff;font-weight:800;">Vido Yanıtları</span>
+    </div>
+    <div class="card">
+      <h2 id="vidoCallTitle"></h2>
+      <div class="small-note">Her oyuncu için "Gördü" veya "Görmedi" işaretleyin. Görmeyen, bu puanla elden çıkar.</div>
+      <div id="vidoRespWrap"></div>
+      <button class="btn-main" id="confirmVidoBtn">Onayla</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 6: HISTORY / TOTALS -->
+  <div class="screen" id="s6">
+    <div class="top-actions">
+      <button class="back-link" data-go="s2">← Masalar</button>
+      <span style="color:#fff;font-weight:800;">Toplamlar</span>
+    </div>
+    <div class="card">
+      <h2>Genel Toplam (₺)</h2>
+      <div id="grandTotalsWrap"></div>
+    </div>
+    <div class="card">
+      <h2>El Geçmişi</h2>
+      <div id="allHistoryWrap"></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="tabbar">
+  <button data-go="s1" id="tabPlayers">OYUNCULAR</button>
+  <button data-go="s2" id="tabTables">MASALAR</button>
+  <button data-go="s6" id="tabTotals">TOPLAMLAR</button>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<script>
+/* ===================== FIREBASE CONFIG ===================== */
+/* Aynı Firebase projesi (pisti-2f056) kullanılıyor, farklı bir
+   kök yol (tavla/) altında - Pişti verisiyle çakışmaz. */
+const firebaseConfig = {
+  apiKey: "AIzaSyDr7hCb8U4G4lw4brY1EClyO3yckGoKdWc",
+  authDomain: "pisti-2f056.firebaseapp.com",
+  databaseURL: "https://pisti-2f056-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "pisti-2f056",
+  storageBucket: "pisti-2f056.firebasestorage.app",
+  messagingSenderId: "449326691735",
+  appId: "1:449326691735:web:eac90ea3eb6d45853980d2"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const ROOT = db.ref("tavla");
+
+/* ===================== LOCAL STATE ===================== */
+let STATE = {
+  players: {},      // id -> name
+  settings: { unitAmount: 0 },
+  tables: {}        // id -> table object
+};
+let currentScreen = "s1";
+let currentTableId = null;
+let setupPick = { seated: {A:null, B:null}, partners: {A:{}, B:{}} };
+let pendingVidoCallingSide = null;
+
+/* ===================== FIREBASE SYNC ===================== */
+ROOT.on("value", snap => {
+  const val = snap.val() || {};
+  STATE.players = val.players || {};
+  STATE.settings = val.settings || { unitAmount: 0 };
+  STATE.tables = val.tables || {};
+  renderAll();
+});
+
+function fbSet(path, value){ ROOT.child(path).set(value); }
+function fbPush(path, value){ return ROOT.child(path).push(value); }
+function fbUpdate(path, value){ ROOT.child(path).update(value); }
+function fbRemove(path){ ROOT.child(path).remove(); }
+
+/* ===================== NAV ===================== */
+document.querySelectorAll("[data-go]").forEach(el=>{
+  el.addEventListener("click", ()=> goScreen(el.getAttribute("data-go")));
+});
+function goScreen(id, tableId){
+  currentScreen = id;
+  if (tableId !== undefined) currentTableId = tableId;
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  document.querySelectorAll(".tabbar button").forEach(b=>b.classList.remove("on"));
+  const tabMap = {s1:"tabPlayers", s2:"tabTables", s6:"tabTotals"};
+  if (tabMap[id]) document.getElementById(tabMap[id]).classList.add("on");
+  renderAll();
+}
+
+/* ===================== RENDER DISPATCH ===================== */
+function renderAll(){
+  renderPlayersScreen();
+  renderTablesScreen();
+  if (currentScreen === "s3") renderSetupScreen();
+  if (currentScreen === "s4") renderGameScreen();
+  if (currentScreen === "s6") renderTotalsScreen();
+}
+
+/* ===================== SCREEN 1: PLAYERS / SETTINGS ===================== */
+function renderPlayersScreen(){
+  document.getElementById("unitAmountInput").value = STATE.settings.unitAmount || "";
+  const wrap = document.getElementById("playerChipList");
+  wrap.innerHTML = "";
+  Object.entries(STATE.players).forEach(([id,name])=>{
+    const chip = document.createElement("div");
+    chip.className = "chip";
+    chip.innerHTML = `<span>${escapeHtml(name)}</span><button data-pid="${id}">×</button>`;
+    chip.querySelector("button").addEventListener("click", ()=>{
+      if (confirm(`${name} silinsin mi?`)) fbRemove(`players/${id}`);
+    });
+    wrap.appendChild(chip);
+  });
+}
+document.getElementById("saveUnitBtn").addEventListener("click", ()=>{
+  const v = parseFloat(document.getElementById("unitAmountInput").value) || 0;
+  fbSet("settings/unitAmount", v);
+});
+document.getElementById("addPlayerBtn").addEventListener("click", addPlayerFromInput);
+document.getElementById("newPlayerInput").addEventListener("keydown", e=>{
+  if (e.key === "Enter") addPlayerFromInput();
+});
+function addPlayerFromInput(){
+  const inp = document.getElementById("newPlayerInput");
+  const name = inp.value.trim();
+  if (!name) return;
+  fbPush("players", name);
+  inp.value = "";
+}
+document.getElementById("goTablesBtn").addEventListener("click", ()=> goScreen("s2"));
+
+/* ===================== SCREEN 2: TABLES LIST ===================== */
+document.getElementById("newTableBtn").addEventListener("click", ()=>{
+  const count = Object.keys(STATE.tables).length + 1;
+  const ref = fbPush("tables", {
+    name: `Masa ${count}`,
+    seated: {A:null, B:null},
+    partners: {A:{}, B:{}},
+    game: null,
+    history: []
+  });
+  setupPick = { seated:{A:null,B:null}, partners:{A:{},B:{}} };
+  goScreen("s3", ref.key);
+});
+
+function renderTablesScreen(){
+  const wrap = document.getElementById("tableListWrap");
+  const ids = Object.keys(STATE.tables);
+  document.getElementById("noTableMsg").style.display = ids.length ? "none" : "block";
+  wrap.innerHTML = "";
+  ids.forEach(id=>{
+    const t = STATE.tables[id];
+    const card = document.createElement("div");
+    card.className = "table-card";
+    const live = t.game && !t.game.finished;
+    const seatedTxt = (t.seated && t.seated.A && t.seated.B)
+      ? `${t.seated.A} <span style="color:var(--muted)">vs</span> ${t.seated.B}`
+      : "Oyuncu seçilmedi";
+    card.innerHTML = `
+      <div class="t-head">
+        <span class="tname">${escapeHtml(t.name)} ${live?'<span class="badge live">CANLI</span>':''}</span>
+      </div>
+      <div class="t-sub">${seatedTxt}</div>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn-soft btn-sm" data-act="open">${live ? 'Devam Et' : (t.seated&&t.seated.A ? 'Yeni El' : 'Kur')}</button>
+        <button class="btn-soft btn-sm" data-act="edit">Düzenle</button>
+        <button class="btn-danger btn-sm" data-act="del">Sil</button>
+      </div>
+    `;
+    card.querySelector('[data-act="open"]').addEventListener("click", ()=>{
+      if (t.seated && t.seated.A && t.seated.B && (!t.game || t.game.finished)) {
+        if (!t.game) { startGameForTable(id); return; }
+      }
+      if (t.seated && t.seated.A && t.seated.B) { goScreen("s4", id); }
+      else { loadSetupPickFromTable(t); goScreen("s3", id); }
+    });
+    card.querySelector('[data-act="edit"]').addEventListener("click", ()=>{
+      loadSetupPickFromTable(t);
+      goScreen("s3", id);
+    });
+    card.querySelector('[data-act="del"]').addEventListener("click", ()=>{
+      if (confirm(`${t.name} silinsin mi? Geçmişi de silinecek.`)) fbRemove(`tables/${id}`);
+    });
+    wrap.appendChild(card);
+  });
+}
+
+function loadSetupPickFromTable(t){
+  setupPick = {
+    seated: { A: (t.seated&&t.seated.A)||null, B: (t.seated&&t.seated.B)||null },
+    partners: {
+      A: Object.assign({}, (t.partners&&t.partners.A)||{}),
+      B: Object.assign({}, (t.partners&&t.partners.B)||{})
+    }
+  };
+}
+
+/* ===================== SCREEN 3: TABLE SETUP ===================== */
+function renderSetupScreen(){
+  const t = STATE.tables[currentTableId];
+  if (!t) return;
+  document.getElementById("setupTableName").textContent = t.name;
+
+  const seatWrap = document.getElementById("seatPickWrap");
+  seatWrap.innerHTML = "";
+  Object.entries(STATE.players).forEach(([id,name])=>{
+    const btn = document.createElement("button");
+    btn.className = "pick";
+    if (setupPick.seated.A === name) btn.classList.add("sel-a");
+    if (setupPick.seated.B === name) btn.classList.add("sel-b");
+    btn.textContent = name + (setupPick.seated.A===name?" (A)":setupPick.seated.B===name?" (B)":"");
+    btn.addEventListener("click", ()=>{
+      if (setupPick.seated.A === name) setupPick.seated.A = null;
+      else if (setupPick.seated.B === name) setupPick.seated.B = null;
+      else if (!setupPick.seated.A) setupPick.seated.A = name;
+      else if (!setupPick.seated.B) setupPick.seated.B = name;
+      else { alert("Önce A veya B'den birini boşaltın."); return; }
+      // remove from partner lists if now seated
+      delete setupPick.partners.A[name];
+      delete setupPick.partners.B[name];
+      renderSetupScreen();
+    });
+    seatWrap.appendChild(btn);
+  });
+
+  renderPartnerPick("partnerAWrap", "A");
+  renderPartnerPick("partnerBWrap", "B");
+}
+
+function renderPartnerPick(wrapId, side){
+  const wrap = document.getElementById(wrapId);
+  wrap.innerHTML = "";
+  Object.entries(STATE.players).forEach(([id,name])=>{
+    if (name === setupPick.seated.A || name === setupPick.seated.B) return;
+    const btn = document.createElement("button");
+    btn.className = "pick";
+    const isOtherSide = side==="A" ? setupPick.partners.B[name] : setupPick.partners.A[name];
+    if (isOtherSide) btn.classList.add("disabled");
+    if (setupPick.partners[side][name]) btn.classList.add(side==="A"?"sel-a":"sel-b");
+    btn.textContent = name;
+    btn.disabled = !!isOtherSide;
+    btn.addEventListener("click", ()=>{
+      if (setupPick.partners[side][name]) delete setupPick.partners[side][name];
+      else setupPick.partners[side][name] = true;
+      renderSetupScreen();
+    });
+    wrap.appendChild(btn);
+  });
+}
+
+document.getElementById("startGameBtn").addEventListener("click", ()=>{
+  if (!setupPick.seated.A || !setupPick.seated.B){
+    alert("Lütfen A ve B taraflarına birer oyuncu seçin.");
+    return;
+  }
+  fbUpdate(`tables/${currentTableId}`, {
+    seated: { A: setupPick.seated.A, B: setupPick.seated.B },
+    partners: { A: setupPick.partners.A, B: setupPick.partners.B }
+  });
+  setTimeout(()=> startGameForTable(currentTableId), 150);
+});
+
+function startGameForTable(id){
+  const t = STATE.tables[id];
+  const seated = t ? t.seated : setupPick.seated;
+  const partners = t ? t.partners : setupPick.partners;
+  const participants = side => {
+    const obj = { seated: {active:true, lockedAt:null} };
+    obj.partners = {};
+    Object.keys((partners&&partners[side])||{}).forEach(name=>{
+      obj.partners[name] = {active:true, lockedAt:null};
+    });
+    return obj;
+  };
+  const game = {
+    multiplier: 1,
+    finished: false,
+    vidoLog: [],
+    status: { A: participants("A"), B: participants("B") }
+  };
+  fbSet(`tables/${id}/game`, game);
+  goScreen("s4", id);
+}
+
+document.getElementById("editSeatsBtn").addEventListener("click", ()=>{
+  const t = STATE.tables[currentTableId];
+  if (t) loadSetupPickFromTable(t);
+  goScreen("s3", currentTableId);
+});
+
+/* ===================== SCREEN 4: GAME ===================== */
+function renderGameScreen(){
+  const t = STATE.tables[currentTableId];
+  if (!t || !t.game) { goScreen("s2"); return; }
+  const g = t.game;
+  document.getElementById("gameTableName").textContent = t.name;
+  document.getElementById("multNum").textContent = g.multiplier;
+
+  renderSideBox("A", t);
+  renderSideBox("B", t);
+
+  const finished = !!g.finished;
+  document.getElementById("liveControls").style.display = finished ? "none" : "block";
+  document.getElementById("finishedPanel").style.display = finished ? "block" : "none";
+
+  if (finished) renderFinishedResults(t);
+
+  // vido log
+  const logWrap = document.getElementById("vidoLogWrap");
+  const logCard = document.getElementById("vidoLogCard");
+  if (g.vidoLog && g.vidoLog.length){
+    logCard.style.display = "block";
+    logWrap.innerHTML = g.vidoLog.map(v=>{
+      const declined = v.declined && v.declined.length ? ` — Görmedi: ${v.declined.join(", ")}` : "";
+      return `<div class="vido-log-row">${v.side==='A'?t.seated.A:t.seated.B} çekti (${v.from}→${v.to})${declined}</div>`;
+    }).join("");
+  } else {
+    logCard.style.display = "none";
+  }
+}
+
+function renderSideBox(side, t){
+  const g = t.game;
+  const seatedName = t.seated[side];
+  const st = g.status[side];
+  const box = document.getElementById(`side${side}Box`);
+  let html = `<div class="s-title">${side} TARAFI</div>`;
+  html += rowHtml(seatedName, "Oturan", st.seated.active, st.seated.lockedAt);
+  Object.entries(st.partners||{}).forEach(([name, p])=>{
+    html += rowHtml(name, "Ortak", p.active, p.lockedAt);
+  });
+  box.innerHTML = html;
+}
+function rowHtml(name, tag, active, lockedAt){
+  const pill = active
+    ? `<span class="status-pill active">OYUNDA</span>`
+    : `<span class="status-pill locked">KİLİTLİ (${lockedAt})</span>`;
+  return `<div class="p-row"><span class="pname">${escapeHtml(name)} <span class="ptag">${tag}</span></span>${pill}</div>`;
+}
+
+document.getElementById("vidoBtn").addEventListener("click", ()=>{
+  const t = STATE.tables[currentTableId];
+  pendingVidoCallingSide = null;
+  const choice = confirm(`${t.seated.A} mı çekti? (Tamam = ${t.seated.A} / İptal = ${t.seated.B})`);
+  pendingVidoCallingSide = choice ? "A" : "B";
+  openVidoResponseScreen();
+});
+
+function openVidoResponseScreen(){
+  const t = STATE.tables[currentTableId];
+  const g = t.game;
+  const callingSide = pendingVidoCallingSide;
+  const oppSide = callingSide === "A" ? "B" : "A";
+  const callerName = t.seated[callingSide];
+  document.getElementById("vidoCallTitle").textContent =
+    `${callerName} vido çekti (${g.multiplier} → ${g.multiplier*2})`;
+
+  const wrap = document.getElementById("vidoRespWrap");
+  wrap.innerHTML = "";
+  const st = g.status[oppSide];
+  const entries = [["seated", t.seated[oppSide], st.seated]];
+  Object.entries(st.partners||{}).forEach(([name,p])=> entries.push(["partner", name, p]));
+
+  entries.forEach(([kind, name, p])=>{
+    if (!p.active) return; // already locked earlier, not asked again
+    const row = document.createElement("div");
+    row.className = "vido-resp-row";
+    row.innerHTML = `
+      <span class="pname">${escapeHtml(name)}</span>
+      <div class="toggle-group" data-name="${escapeHtml(name)}">
+        <button type="button" class="toggle-btn gor on">Gördü</button>
+        <button type="button" class="toggle-btn yok">Görmedi</button>
+      </div>
+    `;
+    const gorBtn = row.querySelector(".gor");
+    const yokBtn = row.querySelector(".yok");
+    gorBtn.addEventListener("click", ()=>{ gorBtn.classList.add("on"); yokBtn.classList.remove("on"); });
+    yokBtn.addEventListener("click", ()=>{ yokBtn.classList.add("on"); gorBtn.classList.remove("on"); });
+    wrap.appendChild(row);
+  });
+
+  goScreen("s5");
+}
+
+document.getElementById("confirmVidoBtn").addEventListener("click", ()=>{
+  const t = STATE.tables[currentTableId];
+  const g = t.game;
+  const callingSide = pendingVidoCallingSide;
+  const oppSide = callingSide === "A" ? "B" : "A";
+  const oldMult = g.multiplier;
+  const newMult = oldMult * 2;
+
+  const responses = {}; // name -> true(gördü)/false(görmedi)
+  document.querySelectorAll("#vidoRespWrap .toggle-group").forEach(grp=>{
+    const name = grp.getAttribute("data-name");
+    const sawIt = grp.querySelector(".gor").classList.contains("on");
+    responses[name] = sawIt;
+  });
+
+  const st = g.status[oppSide];
+  const declined = [];
+  if (st.seated.active){
+    if (responses[t.seated[oppSide]] === false){
+      st.seated.active = false; st.seated.lockedAt = oldMult; declined.push(t.seated[oppSide]);
+    }
+  }
+  Object.keys(st.partners||{}).forEach(name=>{
+    const p = st.partners[name];
+    if (p.active && responses[name] === false){
+      p.active = false; p.lockedAt = oldMult; declined.push(name);
+    }
+  });
+
+  g.vidoLog = g.vidoLog || [];
+  g.vidoLog.push({ side: callingSide, from: oldMult, to: newMult, declined });
+
+  // check if opposing side fully drained -> auto finish at oldMult, calling side wins
+  const oppActive = st.seated.active || Object.values(st.partners||{}).some(p=>p.active);
+  if (!oppActive){
+    finishGame(currentTableId, callingSide, oldMult, g);
+  } else {
+    g.multiplier = newMult;
+    fbSet(`tables/${currentTableId}/game`, g);
+  }
+  goScreen("s4");
+});
+
+document.getElementById("aWinsBtn").addEventListener("click", ()=>{
+  const t = STATE.tables[currentTableId];
+  finishGame(currentTableId, "A", t.game.multiplier, t.game);
+});
+document.getElementById("bWinsBtn").addEventListener("click", ()=>{
+  const t = STATE.tables[currentTableId];
+  finishGame(currentTableId, "B", t.game.multiplier, t.game);
+});
+
+function finishGame(tableId, winnerSide, finalMultiplier, g){
+  const t = STATE.tables[tableId];
+  const unit = STATE.settings.unitAmount || 0;
+  const loserSide = winnerSide === "A" ? "B" : "A";
+  const results = {};
+
+  ["A","B"].forEach(side=>{
+    const st = g.status[side];
+    const seatedName = t.seated[side];
+    results[seatedName] = computeResult(st.seated, side, winnerSide, finalMultiplier, unit);
+    Object.entries(st.partners||{}).forEach(([name,p])=>{
+      results[name] = computeResult(p, side, winnerSide, finalMultiplier, unit);
+    });
+  });
+
+  g.finished = true;
+  g.finalMultiplier = finalMultiplier;
+  g.winner = winnerSide;
+  g.results = results;
+
+  const history = t.history ? t.history.slice() : [];
+  history.push({
+    gameNo: history.length+1,
+    finalMultiplier,
+    winner: winnerSide,
+    results,
+    time: Date.now()
+  });
+
+  fbUpdate(`tables/${tableId}`, { game: g, history });
+}
+
+function computeResult(p, side, winnerSide, finalMultiplier, unit){
+  if (!p.active){
+    return { side, status:"locked", lockedAt:p.lockedAt, amount: -(p.lockedAt*unit) };
+  }
+  const won = side === winnerSide;
+  return { side, status:"active", amount: (won?1:-1)*finalMultiplier*unit };
+}
+
+function renderFinishedResults(t){
+  const g = t.game;
+  const wrap = document.getElementById("finishedResults");
+  wrap.innerHTML = Object.entries(g.results||{}).map(([name,r])=>{
+    const cls = r.amount >= 0 ? "pos" : "neg";
+    const sign = r.amount >= 0 ? "+" : "";
+    return `<div class="result-line"><span>${escapeHtml(name)} ${r.status==='locked'?`(kilitli ${r.lockedAt})`:''}</span><span class="amt ${cls}">${sign}${r.amount.toFixed(2)} ₺</span></div>`;
+  }).join("");
+}
+
+document.getElementById("nextHandBtn").addEventListener("click", ()=>{
+  startGameForTable(currentTableId);
+});
+
+/* ===================== SCREEN 6: TOTALS ===================== */
+function renderTotalsScreen(){
+  const totals = {};
+  Object.values(STATE.tables).forEach(t=>{
+    (t.history||[]).forEach(h=>{
+      Object.entries(h.results||{}).forEach(([name,r])=>{
+        totals[name] = (totals[name]||0) + r.amount;
+      });
+    });
+  });
+  const gw = document.getElementById("grandTotalsWrap");
+  const sorted = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
+  gw.innerHTML = sorted.length ? sorted.map(([name,amt])=>{
+    const cls = amt>=0?"pos":"neg";
+    const sign = amt>=0?"+":"";
+    return `<div class="total-row"><span class="nm">${escapeHtml(name)}</span><span class="amt ${cls}">${sign}${amt.toFixed(2)} ₺</span></div>`;
+  }).join("") : `<div class="small-note">Henüz tamamlanmış el yok.</div>`;
+
+  const hw = document.getElementById("allHistoryWrap");
+  let rows = [];
+  Object.values(STATE.tables).forEach(t=>{
+    (t.history||[]).forEach(h=>{
+      rows.push({tname:t.name, ...h});
+    });
+  });
+  rows.sort((a,b)=>b.time-a.time);
+  hw.innerHTML = rows.length ? rows.map(h=>{
+    const resStr = Object.entries(h.results).map(([n,r])=>`${n}: ${r.amount>=0?'+':''}${r.amount.toFixed(0)}`).join(" · ");
+    return `<div class="history-item"><b>${escapeHtml(h.tname)}</b> · El ${h.gameNo} · ${h.winner} kazandı (x${h.finalMultiplier})<br><span class="small-note">${resStr}</span></div>`;
+  }).join("") : `<div class="small-note">Henüz tamamlanmış el yok.</div>`;
+}
+
+/* ===================== UTIL ===================== */
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+</script>
+</body>
+</html>
