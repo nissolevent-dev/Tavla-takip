@@ -104,6 +104,7 @@
   .btn-ghost{background:transparent;color:var(--gold);text-decoration:underline;padding:6px;}
   .btn-block{width:100%;margin-top:8px;}
   .btn-sm{padding:7px 10px;font-size:13px;border-radius:9px;}
+  .mode-active{background:var(--gold) !important;color:#2a1d05 !important;border-color:var(--gold) !important;}
 
   .chip-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;}
   .chip{
@@ -271,23 +272,46 @@
       <span id="setupTableName" style="color:#fff;font-weight:800;"></span>
     </div>
 
-    <div class="card">
-      <h2>Oturanlar (A / B)</h2>
-      <div class="small-note">Bir oyuncuya dokunarak A veya B tarafına atayın.</div>
-      <div class="player-pick" id="seatPickWrap"></div>
+    <div class="row" style="margin-bottom:12px;">
+      <button class="btn-soft btn-sm" id="modeManualBtn">Manuel Kurulum</button>
+      <button class="btn-soft btn-sm" id="modeDiceBtn">Zar Sırasına Göre</button>
     </div>
 
-    <div class="card">
-      <h2>A Tarafı Ortakları</h2>
-      <div class="player-pick" id="partnerAWrap"></div>
+    <div id="manualSetupView">
+      <div class="card">
+        <h2>Oturanlar (A / B)</h2>
+        <div class="small-note">Bir oyuncuya dokunarak A veya B tarafına atayın.</div>
+        <div class="player-pick" id="seatPickWrap"></div>
+      </div>
+
+      <div class="card">
+        <h2>A Tarafı Ortakları</h2>
+        <div class="player-pick" id="partnerAWrap"></div>
+      </div>
+
+      <div class="card">
+        <h2>B Tarafı Ortakları</h2>
+        <div class="player-pick" id="partnerBWrap"></div>
+      </div>
+
+      <button class="btn-main" id="startGameBtn">Eli Başlat</button>
     </div>
 
-    <div class="card">
-      <h2>B Tarafı Ortakları</h2>
-      <div class="player-pick" id="partnerBWrap"></div>
+    <div id="diceSetupView" style="display:none;">
+      <div class="card">
+        <h2>Masadaki Oyuncular</h2>
+        <div class="small-note">Bu masada kimler oynuyor, seçin.</div>
+        <div class="player-pick" id="diceSelectWrap"></div>
+      </div>
+      <div class="card">
+        <h2>Zar Sırası (Büyükten Küçüğe)</h2>
+        <div class="small-note">Seçtiğiniz oyunculara, zar attıkları sıraya göre (en büyükten en küçüğe) dokunun.</div>
+        <div class="player-pick" id="diceRankPickWrap"></div>
+        <div class="small-note" id="diceRankResult" style="margin-top:10px;font-weight:700;"></div>
+        <button class="btn-ghost" id="diceResetBtn">Sıralamayı Sıfırla</button>
+      </div>
+      <button class="btn-main" id="startDiceGameBtn">Zar Sırasıyla Eli Başlat</button>
     </div>
-
-    <button class="btn-main" id="startGameBtn">Eli Başlat</button>
   </div>
 
   <!-- SCREEN 4: GAME SCREEN -->
@@ -300,6 +324,7 @@
 
     <div class="card">
       <div class="unit-note" id="unitNote"></div>
+      <div class="small-note" id="rotationNote" style="text-align:center;display:none;"></div>
 
       <div class="side-box A" id="sideABox"></div>
       <div class="side-box B" id="sideBBox"></div>
@@ -397,6 +422,8 @@ let STATE = {
 let currentScreen = "s1";
 let currentTableId = null;
 let setupPick = { seated: {A:null, B:null}, partners: {A:{}, B:{}} };
+let setupMode = "manual"; // "manual" | "dice"
+let dicePick = { selected: {}, ranking: [] };
 let pendingVidoCallerName = null;
 let sessionPlayerPick = {};
 let forcingNewSession = false;
@@ -626,6 +653,8 @@ document.getElementById("newTableBtn").addEventListener("click", ()=>{
     history: {}
   });
   setupPick = { seated:{A:null,B:null}, partners:{A:{},B:{}} };
+  setupMode = "manual";
+  dicePick = { selected:{}, ranking:[] };
   goScreen("s3", ref.key);
 });
 
@@ -672,6 +701,8 @@ function renderTablesScreen(){
 }
 
 function loadSetupPickFromTable(t){
+  setupMode = "manual";
+  dicePick = { selected:{}, ranking:[] };
   setupPick = {
     seated: { A: (t.seated&&t.seated.A)||null, B: (t.seated&&t.seated.B)||null },
     partners: {
@@ -682,10 +713,23 @@ function loadSetupPickFromTable(t){
 }
 
 /* ===================== SCREEN 3: TABLE SETUP ===================== */
+function setSetupMode(mode){
+  setupMode = mode;
+  renderSetupScreen();
+}
+document.getElementById("modeManualBtn").addEventListener("click", ()=> setSetupMode("manual"));
+document.getElementById("modeDiceBtn").addEventListener("click", ()=> setSetupMode("dice"));
+
 function renderSetupScreen(){
   const t = STATE.tables[currentTableId];
   if (!t) return;
   document.getElementById("setupTableName").textContent = t.name;
+  document.getElementById("manualSetupView").style.display = setupMode === "manual" ? "block" : "none";
+  document.getElementById("diceSetupView").style.display = setupMode === "dice" ? "block" : "none";
+  document.getElementById("modeManualBtn").classList.toggle("mode-active", setupMode==="manual");
+  document.getElementById("modeDiceBtn").classList.toggle("mode-active", setupMode==="dice");
+  if (setupMode === "dice"){ renderDiceSetupView(); return; }
+
   const names = getSessionPlayerNames();
 
   const seatWrap = document.getElementById("seatPickWrap");
@@ -734,6 +778,110 @@ function renderPartnerPick(wrapId, side){
   });
 }
 
+/* ===================== ZAR SIRASINA GÖRE KURULUM =====================
+   Kural: en büyük atan masada tek kalır (Kral). En küçük atan ilk
+   rakip olur, ondan büyük olanlar sırayla rakip olur, kalanlar ortak.
+   Kazanan hep tek kalır (Kral). Kaybeden (eski Kral veya yenilen rakip)
+   sıranın sonuna eklenir, sıra hiç bozulmadan döner durur. */
+function renderDiceSetupView(){
+  const names = getSessionPlayerNames();
+
+  const selWrap = document.getElementById("diceSelectWrap");
+  selWrap.innerHTML = "";
+  names.forEach(name=>{
+    const btn = document.createElement("button");
+    btn.className = "pick" + (dicePick.selected[name] ? " sel-on" : "");
+    btn.textContent = name;
+    btn.addEventListener("click", ()=>{
+      if (dicePick.selected[name]){
+        delete dicePick.selected[name];
+        dicePick.ranking = dicePick.ranking.filter(n=>n!==name);
+      } else {
+        dicePick.selected[name] = true;
+      }
+      renderDiceSetupView();
+    });
+    selWrap.appendChild(btn);
+  });
+
+  const rankWrap = document.getElementById("diceRankPickWrap");
+  rankWrap.innerHTML = "";
+  Object.keys(dicePick.selected).forEach(name=>{
+    const idx = dicePick.ranking.indexOf(name);
+    const btn = document.createElement("button");
+    btn.className = "pick" + (idx>-1 ? " sel-on" : "");
+    btn.textContent = idx>-1 ? `${idx+1}. ${name}` : name;
+    btn.addEventListener("click", ()=>{
+      if (idx>-1) dicePick.ranking.splice(idx,1);
+      else dicePick.ranking.push(name);
+      renderDiceSetupView();
+    });
+    rankWrap.appendChild(btn);
+  });
+
+  const total = Object.keys(dicePick.selected).length;
+  const resultEl = document.getElementById("diceRankResult");
+  const startBtn = document.getElementById("startDiceGameBtn");
+  if (total < 2){
+    resultEl.textContent = "En az 2 oyuncu seçin.";
+    startBtn.disabled = true;
+  } else if (dicePick.ranking.length < total){
+    resultEl.textContent = `${dicePick.ranking.length}/${total} oyuncu sıralandı.`;
+    startBtn.disabled = true;
+  } else {
+    resultEl.textContent = `Sıra: ${dicePick.ranking.join(" → ")} (büyükten küçüğe)`;
+    startBtn.disabled = false;
+  }
+}
+
+document.getElementById("diceResetBtn").addEventListener("click", ()=>{
+  dicePick.ranking = [];
+  renderDiceSetupView();
+});
+
+/* ranking: en büyükten en küçüğe sıralanmış isim listesi.
+   Kral = ranking[0]. Kuyruk = geri kalanların TERSİ (en küçük en önde). */
+function rotationFromRanking(ranking){
+  const king = ranking[0];
+  const queue = ranking.slice(1).reverse();
+  return seatFromRotation(king, queue);
+}
+function seatFromRotation(king, queue){
+  const challenger = queue[0];
+  const partners = queue.slice(1);
+  const partnersObj = {};
+  partners.forEach(n=> partnersObj[n] = true);
+  return {
+    rotation: { king, queue: partners },
+    seated: { A: king, B: challenger },
+    partners: { A: {}, B: partnersObj }
+  };
+}
+/* Bir el bittiğinde sıradaki eli (yeni Kral/rakip/ortaklar) hesaplar. */
+function advanceRotation(t, winnerSide){
+  const king = t.seated.A;
+  const challenger = t.seated.B;
+  const queueAfterThisHand = (t.rotation && t.rotation.queue ? t.rotation.queue.slice() : []); // bu elin ortakları
+  const loser = winnerSide === "A" ? challenger : king;
+  const newKing = winnerSide === "A" ? king : challenger;
+  const newQueueFull = queueAfterThisHand.concat([loser]);
+  return seatFromRotation(newKing, newQueueFull);
+}
+
+document.getElementById("startDiceGameBtn").addEventListener("click", ()=>{
+  if (dicePick.ranking.length < 2) return;
+  const setup = rotationFromRanking(dicePick.ranking);
+  const game = buildInitialGame(setup.seated, setup.partners);
+  fbUpdate(`${tablesPath()}/${currentTableId}`, {
+    seated: setup.seated,
+    partners: setup.partners,
+    rotation: setup.rotation,
+    usesRotation: true,
+    game
+  });
+  goScreen("s4", currentTableId);
+});
+
 document.getElementById("startGameBtn").addEventListener("click", ()=>{
   if (!setupPick.seated.A || !setupPick.seated.B){
     alert("Lütfen A ve B taraflarına birer oyuncu seçin.");
@@ -742,7 +890,7 @@ document.getElementById("startGameBtn").addEventListener("click", ()=>{
   const seated = { A: setupPick.seated.A, B: setupPick.seated.B };
   const partners = { A: setupPick.partners.A, B: setupPick.partners.B };
   const game = buildInitialGame(seated, partners);
-  fbUpdate(`${tablesPath()}/${currentTableId}`, { seated, partners, game });
+  fbUpdate(`${tablesPath()}/${currentTableId}`, { seated, partners, game, usesRotation: false, rotation: null });
   goScreen("s4", currentTableId);
 });
 
@@ -756,6 +904,7 @@ function startGameForTable(id){
   fbSet(`${tablesPath()}/${id}/game`, game);
   goScreen("s4", id);
 }
+
 
 document.getElementById("editSeatsBtn").addEventListener("click", ()=>{
   const t = STATE.tables[currentTableId];
@@ -778,6 +927,14 @@ function renderGameScreen(){
   } else {
     unitNote.textContent = `Birim tutar 0 ₺! Oyuncular sekmesinden girin, yoksa tutarlar 0 çıkar.`;
     unitNote.classList.add("warn");
+  }
+
+  if (t.usesRotation && t.rotation){
+    document.getElementById("rotationNote").style.display = "block";
+    document.getElementById("rotationNote").textContent =
+      `👑 ${t.rotation.king} masada kalıyor. Sıradaki rakipler: ${t.rotation.queue.join(" → ") || "—"}`;
+  } else {
+    document.getElementById("rotationNote").style.display = "none";
   }
 
   renderSideBox("A", t);
@@ -995,7 +1152,18 @@ function finishHand(tableId, winnerSide, g){
   fbPush(`${tablesPath()}/${tableId}/history`, {
     gameNo, winner: winnerSide, results, time: Date.now()
   });
-  fbSet(`${tablesPath()}/${tableId}/game`, g);
+
+  if (t.usesRotation){
+    const next = advanceRotation(t, winnerSide);
+    fbUpdate(`${tablesPath()}/${tableId}`, {
+      game: g,
+      seated: next.seated,
+      partners: next.partners,
+      rotation: next.rotation
+    });
+  } else {
+    fbSet(`${tablesPath()}/${tableId}/game`, g);
+  }
 }
 
 function renderFinishedResults(t){
