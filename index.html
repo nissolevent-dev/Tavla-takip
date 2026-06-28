@@ -466,6 +466,21 @@ function callableTargets(t, name){
   }
   return targets;
 }
+/* Tabloda (her iki taraf arasında) hâlâ açık (kapanmamış) herhangi bir
+   ikili kaldı mı? Oturan kendi vidosunu reddetse bile, masada (kimde
+   olursa olsun) açık bir hesap kaldığı sürece oturan onlar adına
+   oynamaya devam eder; el ancak HERKES kapandığında biter. */
+function anyOpenPairsRemain(t){
+  const aNames = sideNames(t, "A");
+  const bNames = sideNames(t, "B");
+  for (const a of aNames){
+    for (const b of bNames){
+      const p = (t.game.pairs[a]||{})[b];
+      if (p && !p.closed) return true;
+    }
+  }
+  return false;
+}
 function buildInitialGame(seated, partners){
   const fakeT = { seated, partners };
   const aNames = sideNames(fakeT, "A");
@@ -879,11 +894,9 @@ document.getElementById("confirmVidoBtn").addEventListener("click", ()=>{
     });
 
     g.vidoLog = g.vidoLog || [];
-    let handJustFinished = false;
-    let finishWinnerSide = null;
 
     targets.forEach(oppName=>{
-      const { aName, bName, p } = getPairCell(t, caller, oppName);
+      const { p } = getPairCell(t, caller, oppName);
       const oldCount = p.count;
       const saw = responses[oppName] !== false;
       if (saw){
@@ -893,13 +906,20 @@ document.getElementById("confirmVidoBtn").addEventListener("click", ()=>{
         p.closed = true;
         p.closedLoser = oppName;
         p.closedAtCount = oldCount;
-        if (aName === t.seated.A && bName === t.seated.B){
-          handJustFinished = true;
-          finishWinnerSide = sideOf(t, caller);
-        }
       }
       g.vidoLog.push({ caller, opponent: oppName, from: oldCount, saw });
     });
+
+    // El, sadece masadaki HERKES karşı tarafla kapandığında biter.
+    // Tek bir ikilinin (örn. oturan-oturan) kapanması yetmez; başka
+    // açık hesap varsa oturan onlar adına oynamaya devam eder.
+    let handJustFinished = false;
+    let finishWinnerSide = null;
+    if (!anyOpenPairsRemain(t)){
+      handJustFinished = true;
+      const seatedPair = t.game.pairs[t.seated.A][t.seated.B];
+      finishWinnerSide = (seatedPair && seatedPair.closedLoser === t.seated.A) ? "B" : "A";
+    }
 
     if (handJustFinished){
       finishHand(currentTableId, finishWinnerSide, g);
