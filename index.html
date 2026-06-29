@@ -165,6 +165,7 @@
   .p-row{display:flex;justify-content:space-between;align-items:center;font-size:14px;}
   .p-row .pname{font-weight:700;}
   .p-row .ptag{font-size:10px;color:var(--muted);font-weight:600;}
+  .p-row .ptag-seated{font-size:11px;color:var(--red);font-weight:800;letter-spacing:.5px;}
   .opp-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0 3px 12px;font-size:12.5px;}
   .opp-row .opp-name{color:var(--muted);}
   .status-pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px;white-space:nowrap;}
@@ -183,6 +184,22 @@
   }
   .toggle-btn.gor.on{background:#e3f3e8;border-color:var(--green);color:var(--green);}
   .toggle-btn.yok.on{background:#fbe3e0;border-color:var(--red);color:var(--red);}
+
+  .seer-row{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:11px 13px;border-radius:11px;margin-bottom:8px;
+    border:1.5px solid var(--line);background:var(--card-soft);
+    cursor:pointer;
+  }
+  .seer-row.seen{background:#e3f3e8;border-color:var(--green);}
+  .seer-row.not-seen{background:#fbe3e0;border-color:var(--red);}
+  .seer-row .seer-name{font-weight:700;font-size:14px;}
+  .seer-row .seer-breakdown{font-size:11px;color:var(--muted);margin-top:2px;}
+  .seer-row.seen .seer-breakdown{color:#2c6e49;}
+  .seer-row.not-seen .seer-breakdown{color:#8a3226;}
+  .seer-row .seer-status{font-size:12px;font-weight:800;white-space:nowrap;}
+  .seer-row.seen .seer-status{color:var(--green);}
+  .seer-row.not-seen .seer-status{color:var(--red);}
 
   .result-line{display:flex;justify-content:space-between;align-items:flex-start;font-size:14px;padding:7px 0;border-top:1px solid var(--line);gap:8px;}
   .result-line:first-child{border-top:none;}
@@ -271,8 +288,7 @@
       </div>
       <div id="tableListWrap"></div>
       <div class="empty-msg" id="noTableMsg">Henüz masa yok. "+ Yeni Masa" ile başlayın.</div>
-      <button class="btn-soft btn-block" id="newSessionBtn" style="margin-top:16px;">Yeni Oturum Başlat</button>
-      <button class="btn-soft btn-block" id="closeSessionBtn2" style="margin-top:8px;">Oturumu Kapat (Ödeme Gir)</button>
+      <button class="btn-soft btn-block" id="closeSessionBtn2" style="margin-top:16px;">Oturumu Kapat (Ödeme Gir)</button>
       <button class="btn-danger btn-block" id="deleteSessionBtn" style="margin-top:8px;">Bu Oturumu Sil</button>
     </div>
 
@@ -313,8 +329,7 @@
       <div class="side-box B" id="sideBBox"></div>
 
       <div id="liveControls">
-        <div class="small-note" style="margin-bottom:2px;">Vido çekecek oyuncuya dokunun:</div>
-        <div class="player-pick" id="vidoCallWrap"></div>
+        <button class="btn-main" id="vidoCalledBtn">🎲 Vido Çekildi</button>
         <div class="row" style="margin-top:16px;">
           <button class="btn-main" id="aWinsBtn">A Kazandı</button>
           <button class="btn-main" id="bWinsBtn">B Kazandı</button>
@@ -334,18 +349,23 @@
     </div>
   </div>
 
-  <!-- SCREEN 5: VIDO RESPONSE -->
+  <!-- SCREEN 5: VIDO ÇEKİLDİ -->
   <div class="screen" id="s5">
     <div class="top-actions">
       <button class="back-link" data-go="s4">← Vazgeç</button>
-      <span style="color:#fff;font-weight:800;">Vido Yanıtları</span>
+      <span style="color:#fff;font-weight:800;">Vido Çekildi</span>
     </div>
     <div class="card">
-      <h2 id="vidoCallTitle"></h2>
-      <div class="small-note">Her rakip için "Gördü" veya "Görmedi" işaretleyin. Sadece bu ikilinin arasındaki puan değişir.</div>
-      <div id="vidoRespWrap"></div>
-      <button class="btn-main" id="confirmVidoBtn">Onayla</button>
+      <h2>Vido Çekenler</h2>
+      <div class="small-note">Vidoyu çeken oyuncuları seçin (genelde ortaklar birlikte çeker).</div>
+      <div class="player-pick" id="vidoCallersWrap"></div>
     </div>
+    <div class="card" id="vidoSeersCard" style="display:none;">
+      <h2>Vidoyu Görenler</h2>
+      <div class="small-note">Varsayılan olarak herkes görmüş kabul edilir. Görmeyene dokunup kaldırın.</div>
+      <div id="vidoSeersWrap"></div>
+    </div>
+    <button class="btn-main" id="confirmVidoBtn">Onayla</button>
   </div>
 
   <!-- SCREEN 6: HISTORY / TOTALS -->
@@ -458,7 +478,8 @@ let STATE = {
 let currentScreen = "s1";
 let currentTableId = null;
 let dicePick = { ranking: [] };
-let pendingVidoCallerName = null;
+let selectedVidoCallers = [];
+let selectedVidoSeers = {};
 let sessionPlayerPick = {};
 let forcingNewSession = false;
 let totalsSelectedSession = null;
@@ -580,6 +601,7 @@ function renderAll(){
   renderSessionScreen();
   if (currentScreen === "s3") renderSetupScreen();
   if (currentScreen === "s4") renderGameScreen();
+  if (currentScreen === "s5") renderVidoCallersAndSeers();
   if (currentScreen === "s6") renderTotalsScreen();
   if (currentScreen === "s7") renderCloseSessionScreen();
 }
@@ -767,14 +789,6 @@ document.getElementById("startSessionBtn").addEventListener("click", ()=>{
   fbSet("activeSessionId", ref.key);
   forcingNewSession = false;
   sessionPlayerPick = {};
-});
-
-document.getElementById("newSessionBtn").addEventListener("click", ()=>{
-  if (confirm("Yeni oturum başlatılsın mı? Şu anki masalar geçmişte saklanır, yeni oturum için oyuncuları yeniden seçeceksiniz.")){
-    sessionPlayerPick = {};
-    forcingNewSession = true;
-    renderAll();
-  }
 });
 
 document.getElementById("deleteSessionBtn").addEventListener("click", ()=>{
@@ -1144,7 +1158,6 @@ function renderGameScreen(){
   document.getElementById("liveControls").style.display = finished ? "none" : "block";
   document.getElementById("finishedPanel").style.display = finished ? "block" : "none";
 
-  if (!finished) renderVidoCallPicker(t, g);
   if (finished) renderFinishedResults(t);
 
   const logWrap = document.getElementById("vidoLogWrap");
@@ -1170,8 +1183,11 @@ function renderSideBox(side, t){
   const box = document.getElementById(`side${side}Box`);
   let html = `<div class="s-title">${side} TARAFI</div>`;
   names.forEach(name=>{
-    const tag = name === t.seated[side] ? "Oturan" : "Ortak";
-    html += `<div class="person-block"><div class="p-row"><span class="pname">${escapeHtml(name)}</span><span class="ptag">${tag}</span></div>`;
+    const isSeated = name === t.seated[side];
+    const tagHtml = isSeated
+      ? `<span class="ptag ptag-seated">OTURAN</span>`
+      : `<span class="ptag">Ortak</span>`;
+    html += `<div class="person-block"><div class="p-row"><span class="pname">${escapeHtml(name)}</span>${tagHtml}</div>`;
     oppNames.forEach(opp=>{
       const { p } = getPairCell(t, name, opp);
       if (!p) return;
@@ -1185,86 +1201,112 @@ function renderSideBox(side, t){
   box.innerHTML = html;
 }
 
-/* Vido çağıracak oyuncuyu seçme - herkes, kendi açık/bloke-olmayan
-   ikilileri olduğu sürece bağımsız çekebilir. */
-function renderVidoCallPicker(t, g){
-  const wrap = document.getElementById("vidoCallWrap");
-  wrap.innerHTML = "";
+/* Vido çekme - artık tek kişi yerine birden fazla "çeken" seçilebilir
+   (genelde ortaklar birlikte çeker), ardından bu çekenlerin tüm geçerli
+   rakiplerinin birleşimi "görenler" listesi olarak çıkar. Varsayılan
+   olarak herkes "görmüş" sayılır, görmeyen tek tek çıkarılır. */
+document.getElementById("vidoCalledBtn").addEventListener("click", ()=>{
+  selectedVidoCallers = [];
+  selectedVidoSeers = {};
+  goScreen("s5");
+});
+
+function renderVidoCallersAndSeers(){
+  const t = STATE.tables[currentTableId];
+  if (!t || !t.game) return;
+  const g = t.game;
+
+  const callersWrap = document.getElementById("vidoCallersWrap");
+  callersWrap.innerHTML = "";
   ["A","B"].forEach(side=>{
     sideNames(t, side).forEach(name=>{
       const targets = callableTargets(t, name);
+      if (targets.length === 0) return; // çekemiyorsa listede bile gösterme
       const btn = document.createElement("button");
-      btn.className = "pick " + (side==="A" ? "sel-a" : "sel-b");
+      const isSel = selectedVidoCallers.includes(name);
+      btn.className = "pick " + (side==="A" ? "sel-a" : "sel-b") + (isSel ? "" : " not-selected-caller");
+      if (!isSel) btn.style.opacity = ".45";
       btn.textContent = `🎲 ${name}`;
-      btn.disabled = targets.length === 0;
-      wrap.appendChild(btn);
-      if (targets.length === 0) return;
       btn.addEventListener("click", ()=>{
-        pendingVidoCallerName = name;
-        openVidoResponseScreen();
+        const idx = selectedVidoCallers.indexOf(name);
+        if (idx>-1) selectedVidoCallers.splice(idx,1);
+        else selectedVidoCallers.push(name);
+        renderVidoCallersAndSeers();
       });
+      callersWrap.appendChild(btn);
     });
   });
-}
 
-function openVidoResponseScreen(){
-  const t = STATE.tables[currentTableId];
-  const caller = pendingVidoCallerName;
-  const targets = callableTargets(t, caller);
-  document.getElementById("vidoCallTitle").textContent = `${caller} vido çekti`;
+  const seersCard = document.getElementById("vidoSeersCard");
+  const seersWrap = document.getElementById("vidoSeersWrap");
+  const confirmBtn = document.getElementById("confirmVidoBtn");
 
-  const wrap = document.getElementById("vidoRespWrap");
-  wrap.innerHTML = "";
-  targets.forEach(oppName=>{
-    const { p } = getPairCell(t, caller, oppName);
-    const curVal = Math.pow(2, p.count);
-    const row = document.createElement("div");
-    row.className = "vido-resp-row";
-    row.innerHTML = `
-      <span class="pname">${escapeHtml(oppName)} <span class="ptag">(şu an x${curVal})</span></span>
-      <div class="toggle-group" data-name="${escapeHtml(oppName)}">
-        <button type="button" class="toggle-btn gor on">Gördü</button>
-        <button type="button" class="toggle-btn yok">Görmedi</button>
-      </div>
-    `;
-    const gorBtn = row.querySelector(".gor");
-    const yokBtn = row.querySelector(".yok");
-    gorBtn.addEventListener("click", ()=>{ gorBtn.classList.add("on"); yokBtn.classList.remove("on"); });
-    yokBtn.addEventListener("click", ()=>{ yokBtn.classList.add("on"); gorBtn.classList.remove("on"); });
-    wrap.appendChild(row);
+  if (!selectedVidoCallers.length){
+    seersCard.style.display = "none";
+    confirmBtn.disabled = true;
+    return;
+  }
+
+  // Seçilen tüm çekenlerin geçerli rakiplerinin birleşimi.
+  const targetMap = {}; // isim -> [{caller, value}]
+  selectedVidoCallers.forEach(caller=>{
+    callableTargets(t, caller).forEach(target=>{
+      const { p } = getPairCell(t, caller, target);
+      if (!targetMap[target]) targetMap[target] = [];
+      targetMap[target].push({ caller, value: Math.pow(2, p.count) });
+      if (!(target in selectedVidoSeers)) selectedVidoSeers[target] = true; // varsayılan: gördü
+    });
   });
 
-  goScreen("s5");
+  const targetNames = Object.keys(targetMap);
+  if (!targetNames.length){
+    seersCard.style.display = "block";
+    seersWrap.innerHTML = `<div class="small-note">Seçilen oyuncuların şu an çekebileceği bir rakip yok.</div>`;
+    confirmBtn.disabled = true;
+    return;
+  }
+
+  seersCard.style.display = "block";
+  confirmBtn.disabled = false;
+  seersWrap.innerHTML = "";
+  targetNames.forEach(target=>{
+    const seen = !!selectedVidoSeers[target];
+    const breakdown = targetMap[target].map(x=>`${dativeName(x.caller)} karşı x${x.value}`).join(" · ");
+    const row = document.createElement("div");
+    row.className = "seer-row " + (seen ? "seen" : "not-seen");
+    row.innerHTML = `
+      <div><div class="seer-name">${escapeHtml(target)}</div><div class="seer-breakdown">${escapeHtml(breakdown)}</div></div>
+      <span class="seer-status">${seen ? "GÖRDÜ" : "GÖRMEDİ"}</span>
+    `;
+    row.addEventListener("click", ()=>{
+      selectedVidoSeers[target] = !selectedVidoSeers[target];
+      renderVidoCallersAndSeers();
+    });
+    seersWrap.appendChild(row);
+  });
 }
 
 document.getElementById("confirmVidoBtn").addEventListener("click", ()=>{
   try{
     const t = STATE.tables[currentTableId];
     const g = t.game;
-    const caller = pendingVidoCallerName;
-    const targets = callableTargets(t, caller);
-
-    const responses = {};
-    document.querySelectorAll("#vidoRespWrap .toggle-group").forEach(grp=>{
-      const name = grp.getAttribute("data-name");
-      responses[name] = grp.querySelector(".gor").classList.contains("on");
-    });
-
     g.vidoLog = g.vidoLog || [];
 
-    targets.forEach(oppName=>{
-      const { p } = getPairCell(t, caller, oppName);
-      const oldCount = p.count;
-      const saw = responses[oppName] !== false;
-      if (saw){
-        p.count = oldCount + 1;
-        p.blockedCaller = caller;
-      } else {
-        p.closed = true;
-        p.closedLoser = oppName;
-        p.closedAtCount = oldCount;
-      }
-      g.vidoLog.push({ caller, opponent: oppName, from: oldCount, saw });
+    selectedVidoCallers.forEach(caller=>{
+      callableTargets(t, caller).forEach(targetName=>{
+        const { p } = getPairCell(t, caller, targetName);
+        const oldCount = p.count;
+        const saw = !!selectedVidoSeers[targetName];
+        if (saw){
+          p.count = oldCount + 1;
+          p.blockedCaller = caller;
+        } else {
+          p.closed = true;
+          p.closedLoser = targetName;
+          p.closedAtCount = oldCount;
+        }
+        g.vidoLog.push({ caller, opponent: targetName, from: oldCount, saw });
+      });
     });
 
     // El, sadece masadaki HERKES karşı tarafla kapandığında biter.
@@ -1516,6 +1558,20 @@ function renderTotalsScreen(){
 }
 
 /* ===================== UTIL ===================== */
+/* Türkçe ünlü uyumuna göre isme yaklaşık datif ("-e/-a karşı") eki ekler. */
+function dativeName(name){
+  const vowels = "aeıioöuü";
+  const backVowels = "aıou";
+  const lastChar = name.slice(-1).toLocaleLowerCase("tr");
+  let lastVowel = null;
+  for (let i = name.length - 1; i >= 0; i--){
+    const c = name[i].toLocaleLowerCase("tr");
+    if (vowels.includes(c)){ lastVowel = c; break; }
+  }
+  const suffix = (lastVowel && backVowels.includes(lastVowel)) ? "a" : "e";
+  const buffer = vowels.includes(lastChar) ? "y" : "";
+  return `${name}'${buffer}${suffix}`;
+}
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
