@@ -271,9 +271,9 @@
       </div>
       <div id="tableListWrap"></div>
       <div class="empty-msg" id="noTableMsg">Henüz masa yok. "+ Yeni Masa" ile başlayın.</div>
-      <button class="btn-ghost" id="newSessionBtn" style="display:block;margin:16px auto 0;">Yeni Oturum Başlat</button>
-      <button class="btn-ghost" id="closeSessionBtn2" style="display:block;margin:6px auto 0;">Oturumu Kapat (Ödeme Gir)</button>
-      <button class="btn-ghost" id="deleteSessionBtn" style="display:block;margin:6px auto 0;color:var(--red);">Bu Oturumu Sil</button>
+      <button class="btn-soft btn-block" id="newSessionBtn" style="margin-top:16px;">Yeni Oturum Başlat</button>
+      <button class="btn-soft btn-block" id="closeSessionBtn2" style="margin-top:8px;">Oturumu Kapat (Ödeme Gir)</button>
+      <button class="btn-danger btn-block" id="deleteSessionBtn" style="margin-top:8px;">Bu Oturumu Sil</button>
     </div>
 
   </div>
@@ -287,13 +287,8 @@
 
     <div id="diceSetupView">
       <div class="card">
-        <h2>Masadaki Oyuncular</h2>
-        <div class="small-note">Bu masada kimler oynuyor, seçin.</div>
-        <div class="player-pick" id="diceSelectWrap"></div>
-      </div>
-      <div class="card">
         <h2>Zar Sırası (Büyükten Küçüğe)</h2>
-        <div class="small-note">Seçtiğiniz oyunculara, zar attıkları sıraya göre (en büyükten en küçüğe) dokunun.</div>
+        <div class="small-note">Bugünkü oyunculara, zar attıkları sıraya göre (en büyükten en küçüğe) dokunun.</div>
         <div class="player-pick" id="diceRankPickWrap"></div>
         <div class="small-note" id="diceRankResult" style="margin-top:10px;font-weight:700;"></div>
         <button class="btn-ghost" id="diceResetBtn">Sıralamayı Sıfırla</button>
@@ -449,7 +444,7 @@ let STATE = {
 };
 let currentScreen = "s1";
 let currentTableId = null;
-let dicePick = { selected: {}, ranking: [] };
+let dicePick = { ranking: [] };
 let pendingVidoCallerName = null;
 let sessionPlayerPick = {};
 let forcingNewSession = false;
@@ -846,7 +841,7 @@ document.getElementById("newTableBtn").addEventListener("click", ()=>{
     game: null,
     history: {}
   });
-  dicePick = { selected:{}, ranking:[] };
+  dicePick = { ranking:[] };
   goScreen("s3", ref.key);
 });
 
@@ -893,7 +888,7 @@ function renderTablesScreen(){
 }
 
 function loadSetupPickFromTable(t){
-  dicePick = { selected:{}, ranking:[] };
+  dicePick = { ranking:[] };
 }
 
 /* ===================== SCREEN 3: TABLE SETUP (ZAR SIRASINA GÖRE) =====================
@@ -911,27 +906,9 @@ function renderSetupScreen(){
 function renderDiceSetupView(){
   const names = getSessionPlayerNames();
 
-  const selWrap = document.getElementById("diceSelectWrap");
-  selWrap.innerHTML = "";
-  names.forEach(name=>{
-    const btn = document.createElement("button");
-    btn.className = "pick" + (dicePick.selected[name] ? " sel-on" : "");
-    btn.textContent = name;
-    btn.addEventListener("click", ()=>{
-      if (dicePick.selected[name]){
-        delete dicePick.selected[name];
-        dicePick.ranking = dicePick.ranking.filter(n=>n!==name);
-      } else {
-        dicePick.selected[name] = true;
-      }
-      renderDiceSetupView();
-    });
-    selWrap.appendChild(btn);
-  });
-
   const rankWrap = document.getElementById("diceRankPickWrap");
   rankWrap.innerHTML = "";
-  Object.keys(dicePick.selected).forEach(name=>{
+  names.forEach(name=>{
     const idx = dicePick.ranking.indexOf(name);
     const btn = document.createElement("button");
     btn.className = "pick" + (idx>-1 ? " sel-on" : "");
@@ -944,11 +921,11 @@ function renderDiceSetupView(){
     rankWrap.appendChild(btn);
   });
 
-  const total = Object.keys(dicePick.selected).length;
+  const total = names.length;
   const resultEl = document.getElementById("diceRankResult");
   const startBtn = document.getElementById("startDiceGameBtn");
   if (total < 2){
-    resultEl.textContent = "En az 2 oyuncu seçin.";
+    resultEl.textContent = "Oturuma en az 2 oyuncu eklemelisiniz.";
     startBtn.disabled = true;
   } else if (dicePick.ranking.length < total){
     resultEl.textContent = `${dicePick.ranking.length}/${total} oyuncu sıralandı.`;
@@ -964,10 +941,12 @@ document.getElementById("diceResetBtn").addEventListener("click", ()=>{
   renderDiceSetupView();
 });
 
-/* ranking: en büyükten en küçüğe sıralanmış isim listesi.
-   Kral = ranking[0]. Kuyruk = geri kalanların TERSİ (en küçük en önde).
+/* ranking: en büyükten en küçüğe sıralanmış isim listesi. Kral = ranking[0].
    4 KİŞİDE: Kral HEP TEK kalır, hiçbir zaman yardımcısı olmaz (kazansa
-   da kaybetse de). Rakip her elde değişir, kaybeden sıranın sonuna gider.
+   da kaybetse de). Rakip sırası: önce en küçük zar atan, sonra sırayla
+   "diğer büyük atanlar" - yani 2. en büyük, sonra 3. en büyük (Kral
+   hariç en büyükten en küçüğe doğru, en küçük en başta). Kaybeden
+   sıranın sonuna gider, böylece bu sıra hep aynı şekilde döner.
    5 KİŞİDE: Kral'ın HER ZAMAN bir yardımcısı vardır (2'ye 3 oynanır).
    İlk el: en küçük atan rakip, 4. en büyük (=2. en küçük) Kral'ın
    yardımcısı, kalan 2 kişi rakibin ortağı. Sonraki her elde: oyunu
@@ -975,13 +954,20 @@ document.getElementById("diceResetBtn").addEventListener("click", ()=>{
    yardımcısı olur; eski yardımcı sıranın sonuna gider. */
 function rotationFromRanking(ranking){
   const king = ranking[0];
-  const rest = ranking.slice(1).reverse(); // [en küçük, ..., 2. en büyük]
   const useHelper = ranking.length === 5;
   let kingHelper = null;
-  let queueForChallenger = rest;
+  let queueForChallenger;
   if (useHelper){
+    const rest = ranking.slice(1).reverse(); // [en küçük, ..., 2. en büyük]
     kingHelper = rest[1]; // 4. en büyük = 2. en küçük
     queueForChallenger = [rest[0]].concat(rest.slice(2)); // rakip + kalan ortaklar
+  } else {
+    // 4 kişi (ve Kral hariç yardımcısız diğer durumlar): en küçük önde,
+    // ardından 2.,3.,... en büyükten en küçüğe doğru (DOĞAL sırada).
+    const nonKing = ranking.slice(1); // [2.en büyük, 3.en büyük, ..., en küçük]
+    const lowest = nonKing[nonKing.length - 1];
+    const restInOrder = nonKing.slice(0, -1); // [2.en büyük, 3.en büyük, ...]
+    queueForChallenger = [lowest].concat(restInOrder);
   }
   const setup = seatFromRotation(king, kingHelper, queueForChallenger);
   setup.usesKingHelper = useHelper;
