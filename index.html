@@ -239,6 +239,12 @@
       </div>
       <div class="chip-list" id="playerChipList"></div>
     </div>
+
+    <div class="card">
+      <h2>Başlangıç Bakiyeleri (Bir Defalık)</h2>
+      <div class="small-note">Uygulamayı kullanmaya başlamadan önceki hesapları buradan girin. Pozitif = alacaklı, negatif = borçlu. Bu değerler "Tüm Oturumlar" toplamına bir kere eklenir.</div>
+      <div id="startingBalanceWrap" style="margin-top:8px;"></div>
+    </div>
   </div>
 
   <!-- SCREEN 2: SESSION + TABLES -->
@@ -261,6 +267,7 @@
       <div id="tableListWrap"></div>
       <div class="empty-msg" id="noTableMsg">Henüz masa yok. "+ Yeni Masa" ile başlayın.</div>
       <button class="btn-ghost" id="newSessionBtn" style="display:block;margin:16px auto 0;">Yeni Oturum Başlat</button>
+      <button class="btn-ghost" id="closeSessionBtn2" style="display:block;margin:6px auto 0;">Oturumu Kapat (Ödeme Gir)</button>
       <button class="btn-ghost" id="deleteSessionBtn" style="display:block;margin:6px auto 0;color:var(--red);">Bu Oturumu Sil</button>
     </div>
 
@@ -353,12 +360,49 @@
     </div>
     <div class="card">
       <h2>Toplam (₺)</h2>
+      <div class="small-note" id="totalsScopeNote" style="margin-bottom:6px;"></div>
       <div id="grandTotalsWrap"></div>
+    </div>
+    <div class="card" id="paymentsCard" style="display:none;">
+      <h2>Yapılan Ödemeler</h2>
+      <div id="paymentsListView"></div>
     </div>
     <div class="card">
       <h2>El Geçmişi</h2>
       <div id="allHistoryWrap"></div>
     </div>
+  </div>
+
+  <!-- SCREEN 7: CLOSE SESSION (PAYMENTS) -->
+  <div class="screen" id="s7">
+    <div class="top-actions">
+      <button class="back-link" data-go="s2">← Vazgeç</button>
+      <span style="color:#fff;font-weight:800;">Oturumu Kapat</span>
+    </div>
+    <div class="card">
+      <h2>Hesaplanan Bakiye</h2>
+      <div class="small-note">Bu oturumdaki el sonuçlarına göre kim kime ne kadar borçlu.</div>
+      <div id="closeSessionTotals" style="margin-top:8px;"></div>
+    </div>
+    <div class="card">
+      <h2>Yapılan Ödemeyi Girin</h2>
+      <div class="small-note">Gerçekte kim kime ne kadar ödedi? Birden fazla ödeme ekleyebilirsiniz.</div>
+      <label>Ödeyen</label>
+      <select id="paymentFromSelect"></select>
+      <label>Alan</label>
+      <select id="paymentToSelect"></select>
+      <label>Tutar (₺)</label>
+      <div class="row">
+        <input type="number" id="paymentAmountInput" placeholder="Örn: 50">
+        <button class="btn-soft" id="addPaymentBtn" style="flex:0 0 70px;">Ekle</button>
+      </div>
+      <div id="paymentListWrap" style="margin-top:10px;"></div>
+    </div>
+    <div class="card">
+      <h2>Kalan Bakiye (Ödemeler Sonrası)</h2>
+      <div id="remainingBalancePreview"></div>
+    </div>
+    <button class="btn-main" id="confirmCloseSessionBtn">Oturumu Kapat</button>
   </div>
 
 </div>
@@ -392,6 +436,7 @@ const ROOT = db.ref("tavla");
 let STATE = {
   players: {},
   settings: { unitAmount: 0 },
+  startingBalances: {},
   sessions: {},
   activeSessionId: null,
   tables: {}
@@ -403,12 +448,14 @@ let pendingVidoCallerName = null;
 let sessionPlayerPick = {};
 let forcingNewSession = false;
 let totalsSelectedSession = null;
+let pendingPayments = [];
 
 /* ===================== FIREBASE SYNC ===================== */
 ROOT.on("value", snap => {
   const val = snap.val() || {};
   STATE.players = val.players || {};
   STATE.settings = val.settings || { unitAmount: 0 };
+  STATE.startingBalances = val.startingBalances || {};
   STATE.sessions = val.sessions || {};
   STATE.activeSessionId = val.activeSessionId || null;
   const activeSession = STATE.activeSessionId ? STATE.sessions[STATE.activeSessionId] : null;
@@ -519,6 +566,7 @@ function renderAll(){
   if (currentScreen === "s3") renderSetupScreen();
   if (currentScreen === "s4") renderGameScreen();
   if (currentScreen === "s6") renderTotalsScreen();
+  if (currentScreen === "s7") renderCloseSessionScreen();
 }
 
 /* ===================== SCREEN 1: PLAYERS / SETTINGS ===================== */
@@ -535,6 +583,46 @@ function renderPlayersScreen(){
       if (confirm(`${name} silinsin mi?`)) fbRemove(`players/${id}`);
     });
     wrap.appendChild(chip);
+  });
+  renderStartingBalances();
+}
+
+function renderStartingBalances(){
+  const wrap = document.getElementById("startingBalanceWrap");
+  const names = Object.values(STATE.players);
+  if (!names.length){
+    wrap.innerHTML = `<div class="small-note">Önce yukarıdan oyuncu ekleyin.</div>`;
+    return;
+  }
+  const focusedName = wrap.getAttribute("data-focused");
+  wrap.innerHTML = "";
+  names.forEach(name=>{
+    const row = document.createElement("div");
+    row.className = "row";
+    row.style.marginBottom = "6px";
+    row.style.alignItems = "center";
+    const safeId = "startbal-" + name.replace(/[^a-zA-Z0-9]/g, "_");
+    row.innerHTML = `
+      <span style="flex:1.4;font-weight:600;font-size:14px;">${escapeHtml(name)}</span>
+      <input type="number" id="${safeId}" data-name="${escapeHtml(name)}" placeholder="0" style="flex:1;">
+    `;
+    wrap.appendChild(row);
+    const inp = row.querySelector("input");
+    if (document.activeElement && document.activeElement.id === safeId){
+      // kullanıcı şu an bu kutuya yazıyor, değeri ezme
+    } else {
+      inp.value = STATE.startingBalances[name] || "";
+    }
+    inp.addEventListener("change", ()=>{
+      const v = parseFloat(inp.value) || 0;
+      if (v === 0) fbRemove(`startingBalances/${name}`);
+      else fbSet(`startingBalances/${name}`, v);
+    });
+    inp.addEventListener("blur", ()=>{
+      const v = parseFloat(inp.value) || 0;
+      if (v === 0) fbRemove(`startingBalances/${name}`);
+      else fbSet(`startingBalances/${name}`, v);
+    });
   });
 }
 function saveUnitAmount(){
@@ -626,6 +714,105 @@ document.getElementById("deleteSessionBtn").addEventListener("click", ()=>{
     fbSet("activeSessionId", null);
     sessionPlayerPick = {};
     forcingNewSession = false;
+  }
+});
+
+/* ===================== OTURUMU KAPAT (ÖDEME GİRİŞİ) ===================== */
+function computeSessionHandTotals(session){
+  const totals = {};
+  Object.values((session&&session.tables)||{}).forEach(t=>{
+    Object.values(t.history||{}).forEach(h=>{
+      Object.entries(h.results||{}).forEach(([name,r])=>{
+        const val = (r && typeof r === "object") ? (r.total||0) : (r||0);
+        totals[name] = (totals[name]||0) + val;
+      });
+    });
+  });
+  return totals;
+}
+function applyPaymentsToTotals(totals, payments){
+  (payments||[]).forEach(p=>{
+    totals[p.from] = (totals[p.from]||0) + p.amount;
+    totals[p.to] = (totals[p.to]||0) - p.amount;
+  });
+  return totals;
+}
+function renderBalanceList(container, totals){
+  const sorted = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
+  container.innerHTML = sorted.length ? sorted.map(([name,amt])=>{
+    const cls = amt>=0?"pos":"neg";
+    const sign = amt>=0?"+":"";
+    return `<div class="total-row"><span class="nm">${escapeHtml(name)}</span><span class="amt ${cls}">${sign}${amt.toFixed(2)} ₺</span></div>`;
+  }).join("") : `<div class="small-note">Henüz tamamlanmış el yok.</div>`;
+}
+
+document.getElementById("closeSessionBtn2").addEventListener("click", ()=>{
+  if (!STATE.activeSessionId) return;
+  pendingPayments = [];
+  goScreen("s7");
+});
+
+function renderCloseSessionScreen(){
+  const s = STATE.sessions[STATE.activeSessionId];
+  if (!s){ goScreen("s2"); return; }
+  const names = Object.keys(s.activePlayers||{});
+
+  const totals = computeSessionHandTotals(s);
+  renderBalanceList(document.getElementById("closeSessionTotals"), totals);
+
+  const fromSel = document.getElementById("paymentFromSelect");
+  const toSel = document.getElementById("paymentToSelect");
+  const optHtml = names.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+  if (fromSel.innerHTML !== optHtml) fromSel.innerHTML = optHtml;
+  if (toSel.innerHTML !== optHtml) toSel.innerHTML = optHtml;
+
+  const listWrap = document.getElementById("paymentListWrap");
+  listWrap.innerHTML = pendingPayments.length ? pendingPayments.map((p,i)=>`
+    <div class="result-line">
+      <span>${escapeHtml(p.from)} → ${escapeHtml(p.to)}</span>
+      <span class="amt pos" style="display:flex;align-items:center;gap:8px;">
+        ${p.amount.toFixed(2)} ₺
+        <button class="btn-danger btn-sm" data-idx="${i}">Sil</button>
+      </span>
+    </div>
+  `).join("") : `<div class="small-note">Henüz ödeme eklenmedi.</div>`;
+  listWrap.querySelectorAll("button[data-idx]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      pendingPayments.splice(parseInt(btn.getAttribute("data-idx")), 1);
+      renderCloseSessionScreen();
+    });
+  });
+
+  const remaining = applyPaymentsToTotals(Object.assign({}, totals), pendingPayments);
+  renderBalanceList(document.getElementById("remainingBalancePreview"), remaining);
+}
+
+document.getElementById("addPaymentBtn").addEventListener("click", ()=>{
+  const from = document.getElementById("paymentFromSelect").value;
+  const to = document.getElementById("paymentToSelect").value;
+  const amount = parseFloat(document.getElementById("paymentAmountInput").value);
+  if (!from || !to || from === to){ alert("Ödeyen ve alan farklı kişiler olmalı."); return; }
+  if (!amount || amount <= 0){ alert("Geçerli bir tutar girin."); return; }
+  pendingPayments.push({ from, to, amount });
+  document.getElementById("paymentAmountInput").value = "";
+  renderCloseSessionScreen();
+});
+
+document.getElementById("confirmCloseSessionBtn").addEventListener("click", ()=>{
+  const sid = STATE.activeSessionId;
+  const s = STATE.sessions[sid];
+  if (!s) return;
+  if (confirm(`"${s.name}" oturumu kapatılsın mı? Girdiğiniz ödemeler kaydedilecek ve bu oturum pasif hâle gelecek.`)){
+    fbUpdate(`sessions/${sid}`, {
+      closed: true,
+      closedAt: Date.now(),
+      payments: pendingPayments
+    });
+    fbSet("activeSessionId", null);
+    pendingPayments = [];
+    sessionPlayerPick = {};
+    forcingNewSession = false;
+    goScreen("s2");
   }
 });
 
@@ -1186,6 +1373,43 @@ function renderTotalsScreen(){
       totals[name] = (totals[name]||0) + val;
     });
   });
+
+  const scopeNote = document.getElementById("totalsScopeNote");
+  const paymentsCard = document.getElementById("paymentsCard");
+  const paymentsListView = document.getElementById("paymentsListView");
+
+  if (totalsSelectedSession === "ALL"){
+    Object.entries(STATE.startingBalances||{}).forEach(([name,amt])=>{
+      totals[name] = (totals[name]||0) + (amt||0);
+    });
+    let anyPayments = false;
+    sessionEntries.forEach(([id,s])=>{
+      if (s.closed && s.payments && s.payments.length){
+        applyPaymentsToTotals(totals, s.payments);
+        anyPayments = true;
+      }
+    });
+    scopeNote.textContent = "Başlangıç bakiyeleri ve kapanmış oturumların ödemeleri dahil edilmiştir.";
+    paymentsCard.style.display = "none";
+  } else {
+    const s = STATE.sessions[totalsSelectedSession];
+    if (s && s.closed){
+      scopeNote.textContent = `Bu oturum kapatılmış (${new Date(s.closedAt||0).toLocaleDateString("tr-TR")}). Aşağıdaki tutar, yapılan ödemeler sonrası kalan bakiyedir.`;
+      applyPaymentsToTotals(totals, s.payments);
+      if (s.payments && s.payments.length){
+        paymentsCard.style.display = "block";
+        paymentsListView.innerHTML = s.payments.map(p=>
+          `<div class="result-line"><span>${escapeHtml(p.from)} → ${escapeHtml(p.to)}</span><span class="amt pos">${p.amount.toFixed(2)} ₺</span></div>`
+        ).join("");
+      } else {
+        paymentsCard.style.display = "none";
+      }
+    } else {
+      scopeNote.textContent = "Bu oturumun el sonuçlarına göre hesaplanan toplam (başlangıç bakiyesi dahil değildir).";
+      paymentsCard.style.display = "none";
+    }
+  }
+
   const gw = document.getElementById("grandTotalsWrap");
   const sorted = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
   gw.innerHTML = sorted.length ? sorted.map(([name,amt])=>{
