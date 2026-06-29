@@ -407,6 +407,19 @@
 
 </div>
 
+<!-- ŞİFRE MODALI -->
+<div id="pwModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:16px;padding:22px 20px;max-width:300px;width:100%;">
+    <h2 style="margin:0 0 8px;font-size:14px;color:var(--gold-dark);text-transform:uppercase;font-weight:700;letter-spacing:.5px;">Yönetici Şifresi</h2>
+    <div class="small-note" id="pwModalLabel" style="margin-bottom:12px;"></div>
+    <input type="tel" inputmode="numeric" pattern="[0-9]*" id="pwModalInput" maxlength="8" placeholder="••••" style="font-size:26px;text-align:center;letter-spacing:10px;">
+    <div class="row" style="margin-top:14px;">
+      <button class="btn-soft" id="pwModalCancel">Vazgeç</button>
+      <button class="btn-main" id="pwModalConfirm" style="margin-top:0;">Onayla</button>
+    </div>
+  </div>
+</div>
+
 <div class="tabbar">
   <button data-go="s1" id="tabPlayers">OYUNCULAR</button>
   <button data-go="s2" id="tabTables">MASALAR</button>
@@ -637,9 +650,11 @@ document.getElementById("lockBalancesBtn").addEventListener("click", ()=>{
   }
 });
 document.getElementById("unlockBalancesBtn").addEventListener("click", ()=>{
-  if (confirm("Kilidi açmak istediğine emin misin? Açıldıktan sonra bakiyeler tekrar değiştirilebilir olur.")){
-    fbSet("startingBalancesLocked", false);
-  }
+  askPassword("Bakiye kilidini açma", ()=>{
+    if (confirm("Kilidi açmak istediğine emin misin? Açıldıktan sonra bakiyeler tekrar değiştirilebilir olur.")){
+      fbSet("startingBalancesLocked", false);
+    }
+  });
 });
 function saveUnitAmount(){
   const v = parseFloat(document.getElementById("unitAmountInput").value) || 0;
@@ -648,6 +663,46 @@ function saveUnitAmount(){
 document.getElementById("saveUnitBtn").addEventListener("click", saveUnitAmount);
 document.getElementById("unitAmountInput").addEventListener("change", saveUnitAmount);
 document.getElementById("unitAmountInput").addEventListener("blur", saveUnitAmount);
+
+/* ===================== ŞİFRE MODALI =====================
+   Hassas işlemler (bakiye kilidi açma, oturum silme) için sabit
+   yönetici şifresi. Sayısal (numpad) klavye açılması için input
+   type="tel" + inputmode="numeric" kullanılıyor. */
+const ADMIN_PASSWORD = "2580";
+let pwModalOnSuccess = null;
+
+function askPassword(actionLabel, onSuccess){
+  document.getElementById("pwModalLabel").textContent = `${actionLabel} için şifreyi girin:`;
+  const inp = document.getElementById("pwModalInput");
+  inp.value = "";
+  document.getElementById("pwModalOverlay").style.display = "flex";
+  pwModalOnSuccess = onSuccess;
+  setTimeout(()=> inp.focus(), 50);
+}
+function closePwModal(){
+  document.getElementById("pwModalOverlay").style.display = "none";
+  pwModalOnSuccess = null;
+}
+document.getElementById("pwModalCancel").addEventListener("click", closePwModal);
+document.getElementById("pwModalOverlay").addEventListener("click", (e)=>{
+  if (e.target.id === "pwModalOverlay") closePwModal();
+});
+document.getElementById("pwModalConfirm").addEventListener("click", ()=>{
+  const entered = document.getElementById("pwModalInput").value;
+  const cb = pwModalOnSuccess;
+  if (entered === ADMIN_PASSWORD){
+    closePwModal();
+    if (cb) cb();
+  } else {
+    alert("Şifre yanlış.");
+    document.getElementById("pwModalInput").value = "";
+    document.getElementById("pwModalInput").focus();
+  }
+});
+document.getElementById("pwModalInput").addEventListener("keydown", e=>{
+  if (e.key === "Enter") document.getElementById("pwModalConfirm").click();
+});
+
 document.getElementById("addPlayerBtn").addEventListener("click", addPlayerFromInput);
 document.getElementById("newPlayerInput").addEventListener("keydown", e=>{
   if (e.key === "Enter") addPlayerFromInput();
@@ -725,12 +780,14 @@ document.getElementById("newSessionBtn").addEventListener("click", ()=>{
 document.getElementById("deleteSessionBtn").addEventListener("click", ()=>{
   const s = STATE.sessions[STATE.activeSessionId];
   if (!s) return;
-  if (confirm(`"${s.name}" oturumu ve içindeki tüm masalar/geçmiş tamamen silinsin mi? Bu işlem geri alınamaz.`)){
-    fbRemove(`sessions/${STATE.activeSessionId}`);
-    fbSet("activeSessionId", null);
-    sessionPlayerPick = {};
-    forcingNewSession = false;
-  }
+  askPassword("Oturumu silme", ()=>{
+    if (confirm(`"${s.name}" oturumu ve içindeki tüm masalar/geçmiş tamamen silinsin mi? Bu işlem geri alınamaz.`)){
+      fbRemove(`sessions/${STATE.activeSessionId}`);
+      fbSet("activeSessionId", null);
+      sessionPlayerPick = {};
+      forcingNewSession = false;
+    }
+  });
 });
 
 /* ===================== OTURUMU KAPAT (ÖDEME GİRİŞİ) ===================== */
@@ -1338,12 +1395,14 @@ document.getElementById("deleteTotalsSessionBtn").addEventListener("click", ()=>
   if (totalsSelectedSession === "ALL") return;
   const s = STATE.sessions[totalsSelectedSession];
   if (!s) return;
-  if (confirm(`"${s.name}" oturumu ve içindeki tüm masalar/geçmiş tamamen silinsin mi? Bu işlem geri alınamaz.`)){
-    const wasActive = STATE.activeSessionId === totalsSelectedSession;
-    fbRemove(`sessions/${totalsSelectedSession}`);
-    if (wasActive) fbSet("activeSessionId", null);
-    totalsSelectedSession = "ALL";
-  }
+  askPassword("Oturumu silme", ()=>{
+    if (confirm(`"${s.name}" oturumu ve içindeki tüm masalar/geçmiş tamamen silinsin mi? Bu işlem geri alınamaz.`)){
+      const wasActive = STATE.activeSessionId === totalsSelectedSession;
+      fbRemove(`sessions/${totalsSelectedSession}`);
+      if (wasActive) fbSet("activeSessionId", null);
+      totalsSelectedSession = "ALL";
+    }
+  });
 });
 
 function renderTotalsScreen(){
