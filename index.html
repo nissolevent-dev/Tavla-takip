@@ -244,6 +244,11 @@
       <h2>Başlangıç Bakiyeleri (Bir Defalık)</h2>
       <div class="small-note">Uygulamayı kullanmaya başlamadan önceki hesapları buradan girin. Pozitif = alacaklı, negatif = borçlu. Bu değerler "Tüm Oturumlar" toplamına bir kere eklenir.</div>
       <div id="startingBalanceWrap" style="margin-top:8px;"></div>
+      <button class="btn-soft btn-block" id="lockBalancesBtn" style="margin-top:10px;">Bakiyeleri Kilitle</button>
+      <div id="balancesLockedNote" style="display:none;text-align:center;margin-top:10px;">
+        <div class="small-note" style="font-weight:700;">🔒 Başlangıç bakiyeleri kilitli, değiştirilemez.</div>
+        <button class="btn-ghost" id="unlockBalancesBtn">Kilidi Aç (Düzenlemek İçin)</button>
+      </div>
     </div>
   </div>
 
@@ -437,6 +442,7 @@ let STATE = {
   players: {},
   settings: { unitAmount: 0 },
   startingBalances: {},
+  startingBalancesLocked: false,
   sessions: {},
   activeSessionId: null,
   tables: {}
@@ -456,6 +462,7 @@ ROOT.on("value", snap => {
   STATE.players = val.players || {};
   STATE.settings = val.settings || { unitAmount: 0 };
   STATE.startingBalances = val.startingBalances || {};
+  STATE.startingBalancesLocked = !!val.startingBalancesLocked;
   STATE.sessions = val.sessions || {};
   STATE.activeSessionId = val.activeSessionId || null;
   const activeSession = STATE.activeSessionId ? STATE.sessions[STATE.activeSessionId] : null;
@@ -589,12 +596,15 @@ function renderPlayersScreen(){
 
 function renderStartingBalances(){
   const wrap = document.getElementById("startingBalanceWrap");
+  const locked = !!STATE.startingBalancesLocked;
+  document.getElementById("lockBalancesBtn").style.display = locked ? "none" : "block";
+  document.getElementById("balancesLockedNote").style.display = locked ? "block" : "none";
+
   const names = Object.values(STATE.players);
   if (!names.length){
     wrap.innerHTML = `<div class="small-note">Önce yukarıdan oyuncu ekleyin.</div>`;
     return;
   }
-  const focusedName = wrap.getAttribute("data-focused");
   wrap.innerHTML = "";
   names.forEach(name=>{
     const row = document.createElement("div");
@@ -604,7 +614,7 @@ function renderStartingBalances(){
     const safeId = "startbal-" + name.replace(/[^a-zA-Z0-9]/g, "_");
     row.innerHTML = `
       <span style="flex:1.4;font-weight:600;font-size:14px;">${escapeHtml(name)}</span>
-      <input type="number" id="${safeId}" data-name="${escapeHtml(name)}" placeholder="0" style="flex:1;">
+      <input type="number" id="${safeId}" data-name="${escapeHtml(name)}" placeholder="0" style="flex:1;" ${locked ? "disabled" : ""}>
     `;
     wrap.appendChild(row);
     const inp = row.querySelector("input");
@@ -613,6 +623,7 @@ function renderStartingBalances(){
     } else {
       inp.value = STATE.startingBalances[name] || "";
     }
+    if (locked) return; // kilitliyken kaydetme dinleyicileri gerekmez
     inp.addEventListener("change", ()=>{
       const v = parseFloat(inp.value) || 0;
       if (v === 0) fbRemove(`startingBalances/${name}`);
@@ -625,6 +636,16 @@ function renderStartingBalances(){
     });
   });
 }
+document.getElementById("lockBalancesBtn").addEventListener("click", ()=>{
+  if (confirm("Başlangıç bakiyeleri kilitlensin mi? Kilitledikten sonra yanlışlıkla değiştirilemez (gerekirse sonra kilidi açabilirsin).")){
+    fbSet("startingBalancesLocked", true);
+  }
+});
+document.getElementById("unlockBalancesBtn").addEventListener("click", ()=>{
+  if (confirm("Kilidi açmak istediğine emin misin? Açıldıktan sonra bakiyeler tekrar değiştirilebilir olur.")){
+    fbSet("startingBalancesLocked", false);
+  }
+});
 function saveUnitAmount(){
   const v = parseFloat(document.getElementById("unitAmountInput").value) || 0;
   fbSet("settings/unitAmount", v);
