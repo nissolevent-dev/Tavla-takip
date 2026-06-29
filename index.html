@@ -395,6 +395,7 @@
       <h2>Toplam (₺)</h2>
       <div class="small-note" id="totalsScopeNote" style="margin-bottom:6px;"></div>
       <div id="grandTotalsWrap"></div>
+      <button class="btn-soft btn-block" id="shareWhatsappTotalsBtn" style="margin-top:10px;">📲 WhatsApp'ta Paylaş</button>
     </div>
     <div class="card" id="paymentsCard" style="display:none;">
       <h2>Yapılan Ödemeler</h2>
@@ -434,6 +435,7 @@
     <div class="card">
       <h2>Kalan Bakiye (Ödemeler Sonrası)</h2>
       <div id="remainingBalancePreview"></div>
+      <button class="btn-soft btn-block" id="shareWhatsappCloseBtn" style="margin-top:10px;">📲 WhatsApp'ta Paylaş</button>
     </div>
     <button class="btn-main" id="confirmCloseSessionBtn">Oturumu Kapat</button>
   </div>
@@ -497,6 +499,7 @@ let selectedVidoSeers = {};
 let sessionPlayerPick = {};
 let forcingNewSession = false;
 let totalsSelectedSession = null;
+let lastTotalsShareData = null;
 let pendingPayments = [];
 
 /* ===================== FIREBASE SYNC ===================== */
@@ -875,10 +878,37 @@ function renderBalanceList(container, totals){
   }).join("") : `<div class="small-note">Henüz tamamlanmış el yok.</div>`;
 }
 
+/* ===================== WHATSAPP'TA PAYLAŞ =====================
+   Hesap tablosunu (ve varsa ödemeleri) WhatsApp'a hazır bir metin
+   olarak gönderir; kullanıcı kime göndereceğini WhatsApp içinde seçer. */
+function buildBalanceShareText(title, totals, payments){
+  const sorted = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
+  let text = `*TAVLA Hesap Özeti*\n_${title}_\n\n*Bakiye:*\n`;
+  text += sorted.length
+    ? sorted.map(([name,amt])=>`${name}: ${amt>=0?'+':''}${amt.toFixed(2)} ₺`).join("\n")
+    : "Henüz tamamlanmış el yok.";
+  if (payments && payments.length){
+    text += `\n\n*Ödemeler:*\n`;
+    text += payments.map(p=>`${p.from} → ${p.to}: ${p.amount.toFixed(2)} ₺`).join("\n");
+  }
+  return text;
+}
+function shareViaWhatsApp(text){
+  window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank");
+}
+
 document.getElementById("closeSessionBtn2").addEventListener("click", ()=>{
   if (!STATE.activeSessionId) return;
   pendingPayments = [];
   goScreen("s7");
+});
+
+document.getElementById("shareWhatsappCloseBtn").addEventListener("click", ()=>{
+  const s = STATE.sessions[STATE.activeSessionId];
+  if (!s) return;
+  const totals = computeSessionHandTotals(s);
+  applyPaymentsToTotals(totals, pendingPayments);
+  shareViaWhatsApp(buildBalanceShareText(s.name, totals, pendingPayments));
 });
 
 function renderCloseSessionScreen(){
@@ -1489,6 +1519,12 @@ document.getElementById("deleteTotalsSessionBtn").addEventListener("click", ()=>
   });
 });
 
+document.getElementById("shareWhatsappTotalsBtn").addEventListener("click", ()=>{
+  if (!lastTotalsShareData) return;
+  const { title, totals, payments } = lastTotalsShareData;
+  shareViaWhatsApp(buildBalanceShareText(title, totals, payments));
+});
+
 function renderTotalsScreen(){
   if (totalsSelectedSession === null){
     totalsSelectedSession = STATE.activeSessionId || "ALL";
@@ -1567,6 +1603,15 @@ function renderTotalsScreen(){
     const sign = amt>=0?"+":"";
     return `<div class="total-row"><span class="nm">${escapeHtml(name)}</span><span class="amt ${cls}">${sign}${amt.toFixed(2)} ₺</span></div>`;
   }).join("") : `<div class="small-note">Henüz tamamlanmış el yok.</div>`;
+
+  // WhatsApp'ta Paylaş butonu için şu an ekranda gösterilen veriyi sakla.
+  lastTotalsShareData = {
+    title: totalsSelectedSession === "ALL" ? "Tüm Oturumlar" : (STATE.sessions[totalsSelectedSession]?.name || ""),
+    totals: Object.assign({}, totals),
+    payments: totalsSelectedSession !== "ALL" && STATE.sessions[totalsSelectedSession]
+      ? (STATE.sessions[totalsSelectedSession].payments || [])
+      : null
+  };
 
   const hw = document.getElementById("allHistoryWrap");
   rows.sort((a,b)=>(b.time||0)-(a.time||0));
