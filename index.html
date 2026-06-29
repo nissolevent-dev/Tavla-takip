@@ -254,7 +254,7 @@
 <div class="wrap">
 
   <!-- SCREEN 1: PLAYERS / SETTINGS -->
-  <div class="screen active" id="s1">
+  <div class="screen" id="s1">
     <div class="card">
       <h2>Birim Tutar (₺)</h2>
       <input type="number" id="unitAmountInput" placeholder="Örn: 10" inputmode="decimal">
@@ -283,7 +283,7 @@
   </div>
 
   <!-- SCREEN 2: SESSION + TABLES -->
-  <div class="screen" id="s2">
+  <div class="screen active" id="s2">
 
     <div id="sessionSetupView">
       <div class="card">
@@ -491,7 +491,7 @@ let STATE = {
   activeSessionId: null,
   tables: {}
 };
-let currentScreen = "s1";
+let currentScreen = "s2";
 let currentTableId = null;
 let dicePick = { ranking: [] };
 let selectedVidoCallers = [];
@@ -1812,6 +1812,9 @@ function dativeName(name){
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
+
+/* Uygulama açılışta Masalar sekmesinde başlasın. */
+goScreen("s2");
 </script>
 </body>
 </html>
