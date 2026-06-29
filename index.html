@@ -757,32 +757,69 @@ document.getElementById("diceResetBtn").addEventListener("click", ()=>{
 });
 
 /* ranking: en büyükten en küçüğe sıralanmış isim listesi.
-   Kral = ranking[0]. Kuyruk = geri kalanların TERSİ (en küçük en önde). */
+   Kral = ranking[0]. Kuyruk = geri kalanların TERSİ (en küçük en önde).
+   5 kişide Kral'ın da bir yardımcısı olur (2'ye 3 oynanır): en küçük
+   atan rakip, ondan bir büyük olan (4'üncü en büyük) Kral'ın yardımcısı,
+   kalanlar rakibin ortağı.
+   Her el sonunda: oyunu (oturarak) kaybeden, SIRADAKİ elde doğrudan
+   Kral'ın yardımcısı olur. Eski yardımcı (kazansa da kaybetse de)
+   sıranın sonuna gider, böylece herkes sırayla rakip olma hakkını alır. */
 function rotationFromRanking(ranking){
   const king = ranking[0];
-  const queue = ranking.slice(1).reverse();
-  return seatFromRotation(king, queue);
+  const rest = ranking.slice(1).reverse(); // [en küçük, ..., 2. en büyük]
+  const useHelper = ranking.length === 5;
+  let kingHelper = null;
+  let queueForChallenger = rest;
+  if (useHelper){
+    kingHelper = rest[1]; // 4. en büyük = 2. en küçük
+    queueForChallenger = [rest[0]].concat(rest.slice(2)); // rakip + kalan ortaklar
+  }
+  const setup = seatFromRotation(king, kingHelper, queueForChallenger);
+  setup.usesKingHelper = useHelper;
+  return setup;
 }
-function seatFromRotation(king, queue){
+function seatFromRotation(king, kingHelper, queue){
   const challenger = queue[0];
-  const partners = queue.slice(1);
-  const partnersObj = {};
-  partners.forEach(n=> partnersObj[n] = true);
+  const challengerHelpers = queue.slice(1);
+  const partnersA = {};
+  if (kingHelper) partnersA[kingHelper] = true;
+  const partnersB = {};
+  challengerHelpers.forEach(n=> partnersB[n] = true);
   return {
-    rotation: { king, queue: partners },
+    rotation: { king, queue: challengerHelpers, kingHelper: kingHelper || null },
     seated: { A: king, B: challenger },
-    partners: { A: {}, B: partnersObj }
+    partners: { A: partnersA, B: partnersB }
   };
 }
-/* Bir el bittiğinde sıradaki eli (yeni Kral/rakip/ortaklar) hesaplar. */
+/* Bir el bittiğinde sıradaki eli (yeni Kral/yardımcı/rakip/ortaklar) hesaplar. */
 function advanceRotation(t, winnerSide){
+  const useHelper = !!t.usesKingHelper;
   const king = t.seated.A;
+  const kingHelper = t.rotation && t.rotation.kingHelper ? t.rotation.kingHelper : null;
   const challenger = t.seated.B;
-  const queueAfterThisHand = (t.rotation && t.rotation.queue ? t.rotation.queue.slice() : []); // bu elin ortakları
-  const loser = winnerSide === "A" ? challenger : king;
-  const newKing = winnerSide === "A" ? king : challenger;
-  const newQueueFull = queueAfterThisHand.concat([loser]);
-  return seatFromRotation(newKing, newQueueFull);
+  const challengerHelpers = (t.rotation && t.rotation.queue ? t.rotation.queue.slice() : []); // bu elin rakip ortakları
+
+  let newKing, seatedLoser;
+  if (winnerSide === "A"){
+    newKing = king;
+    seatedLoser = challenger;
+  } else {
+    newKing = challenger;
+    seatedLoser = king;
+  }
+
+  let newQueueForChallenger, newKingHelper;
+  if (useHelper){
+    newKingHelper = seatedLoser; // kaybeden oturan doğrudan yeni yardımcı olur
+    newQueueForChallenger = kingHelper ? challengerHelpers.concat([kingHelper]) : challengerHelpers.slice();
+  } else {
+    newKingHelper = null;
+    newQueueForChallenger = challengerHelpers.concat([seatedLoser]);
+  }
+
+  const result = seatFromRotation(newKing, newKingHelper, newQueueForChallenger);
+  result.usesKingHelper = useHelper;
+  return result;
 }
 
 document.getElementById("startDiceGameBtn").addEventListener("click", ()=>{
@@ -794,6 +831,7 @@ document.getElementById("startDiceGameBtn").addEventListener("click", ()=>{
     partners: setup.partners,
     rotation: setup.rotation,
     usesRotation: true,
+    usesKingHelper: setup.usesKingHelper,
     game
   });
   goScreen("s4", currentTableId);
@@ -836,8 +874,9 @@ function renderGameScreen(){
 
   if (t.usesRotation && t.rotation){
     document.getElementById("rotationNote").style.display = "block";
+    const helperTxt = t.rotation.kingHelper ? ` (yardımcısı: ${t.rotation.kingHelper})` : "";
     document.getElementById("rotationNote").textContent =
-      `👑 ${t.rotation.king} masada kalıyor. Sıradaki rakipler: ${t.rotation.queue.join(" → ") || "—"}`;
+      `👑 ${t.rotation.king}${helperTxt} masada kalıyor. Sıradaki rakipler: ${t.rotation.queue.join(" → ") || "—"}`;
   } else {
     document.getElementById("rotationNote").style.display = "none";
   }
