@@ -395,7 +395,7 @@
       <h2>Toplam (₺)</h2>
       <div class="small-note" id="totalsScopeNote" style="margin-bottom:6px;"></div>
       <div id="grandTotalsWrap"></div>
-      <button class="btn-soft btn-block" id="shareWhatsappTotalsBtn" style="margin-top:10px;">📲 WhatsApp'ta Paylaş</button>
+      <button class="btn-soft btn-block" id="shareWhatsappTotalsBtn" style="margin-top:10px;">📲 Görsel Olarak Paylaş</button>
     </div>
     <div class="card" id="paymentsCard" style="display:none;">
       <h2>Yapılan Ödemeler</h2>
@@ -435,7 +435,7 @@
     <div class="card">
       <h2>Kalan Bakiye (Ödemeler Sonrası)</h2>
       <div id="remainingBalancePreview"></div>
-      <button class="btn-soft btn-block" id="shareWhatsappCloseBtn" style="margin-top:10px;">📲 WhatsApp'ta Paylaş</button>
+      <button class="btn-soft btn-block" id="shareWhatsappCloseBtn" style="margin-top:10px;">📲 Görsel Olarak Paylaş</button>
     </div>
     <button class="btn-main" id="confirmCloseSessionBtn">Oturumu Kapat</button>
   </div>
@@ -878,23 +878,173 @@ function renderBalanceList(container, totals){
   }).join("") : `<div class="small-note">Henüz tamamlanmış el yok.</div>`;
 }
 
-/* ===================== WHATSAPP'TA PAYLAŞ =====================
-   Hesap tablosunu (ve varsa ödemeleri) WhatsApp'a hazır bir metin
-   olarak gönderir; kullanıcı kime göndereceğini WhatsApp içinde seçer. */
-function buildBalanceShareText(title, totals, payments){
-  const sorted = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
-  let text = `*TAVLA Hesap Özeti*\n_${title}_\n\n*Bakiye:*\n`;
-  text += sorted.length
-    ? sorted.map(([name,amt])=>`${name}: ${amt>=0?'+':''}${amt.toFixed(2)} ₺`).join("\n")
-    : "Henüz tamamlanmış el yok.";
-  if (payments && payments.length){
-    text += `\n\n*Ödemeler:*\n`;
-    text += payments.map(p=>`${p.from} → ${p.to}: ${p.amount.toFixed(2)} ₺`).join("\n");
+/* ===================== GÖRSEL KART OLARAK PAYLAŞ =====================
+   Hesap tablosunu, Pişti'deki gibi büyük fontlu okunaklı bir görsel
+   (PNG) kart olarak çizip telefonun paylaşım penceresinden (WhatsApp
+   dahil) gönderir. */
+function drawRoundedRect(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  if (ctx.roundRect){ ctx.roundRect(x, y, w, h, r); }
+  else {
+    ctx.moveTo(x+r, y);
+    ctx.arcTo(x+w, y, x+w, y+h, r);
+    ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r);
+    ctx.arcTo(x, y, x+w, y, r);
   }
-  return text;
+  ctx.closePath();
 }
-function shareViaWhatsApp(text){
-  window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank");
+
+function buildShareCanvas(title, subtitle, totals, payments){
+  const W = 900;
+  const rowH = 86;
+  const sorted = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
+  const payRows = payments && payments.length ? payments.length : 0;
+
+  let H = 300; // başlık + tarih alanı
+  H += sorted.length ? sorted.length * rowH : rowH;
+  if (payRows){ H += 90 + payRows * rowH; } // ödemeler başlığı + satırları
+  H += 60; // alt boşluk
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+
+  // arka plan (koyu yeşil gradyan)
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, "#0f4d3a");
+  grad.addColorStop(1, "#0b3d2e");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  let y = 70;
+  ctx.textAlign = "center";
+
+  // başlık
+  ctx.fillStyle = "#d4a44c";
+  ctx.font = "900 56px -apple-system, system-ui, sans-serif";
+  ctx.fillText("TAVLA", W/2, y);
+  y += 36;
+
+  ctx.fillStyle = "#cfe8da";
+  ctx.font = "700 20px -apple-system, system-ui, sans-serif";
+  ctx.fillText("O R T A K L I   T A K İ P", W/2, y);
+  y += 44;
+
+  ctx.fillStyle = "#e8e8e0";
+  ctx.font = "600 26px -apple-system, system-ui, sans-serif";
+  ctx.fillText(subtitle, W/2, y);
+  y += 28;
+
+  // ayraç çizgisi
+  ctx.strokeStyle = "rgba(212,164,76,0.6)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(60, y);
+  ctx.lineTo(W-60, y);
+  ctx.stroke();
+  y += 20;
+
+  ctx.fillStyle = "#d4a44c";
+  ctx.font = "800 24px -apple-system, system-ui, sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText("BAKİYE", 60, y + 28);
+  y += 52;
+
+  function drawRow(rank, name, amountText, isPositive){
+    drawRoundedRect(ctx, 50, y, W-100, rowH-14, 16);
+    ctx.fillStyle = "rgba(255,255,255,0.07)";
+    ctx.fill();
+
+    if (rank !== null){
+      ctx.fillStyle = "rgba(255,255,255,0.45)";
+      ctx.font = "600 22px -apple-system, system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText(String(rank), 78, y + (rowH-14)/2 + 9);
+    }
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "700 32px -apple-system, system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(name, rank !== null ? 116 : 80, y + (rowH-14)/2 + 11);
+
+    ctx.fillStyle = isPositive ? "#3ddc84" : "#ff6b5e";
+    ctx.font = "800 34px -apple-system, system-ui, sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(amountText, W-80, y + (rowH-14)/2 + 12);
+
+    y += rowH;
+  }
+
+  if (sorted.length){
+    sorted.forEach(([name, amt], i)=>{
+      const sign = amt >= 0 ? "+" : "";
+      drawRow(i+1, name, `${sign}${amt.toFixed(2)} ₺`, amt >= 0);
+    });
+  } else {
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.font = "500 24px -apple-system, system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Henüz tamamlanmış el yok.", W/2, y + 30);
+    y += rowH;
+  }
+
+  if (payRows){
+    y += 30;
+    ctx.fillStyle = "#d4a44c";
+    ctx.font = "800 24px -apple-system, system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("ÖDEMELER", 60, y + 28);
+    y += 52;
+
+    payments.forEach(p=>{
+      drawRoundedRect(ctx, 50, y, W-100, rowH-14, 16);
+      ctx.fillStyle = "rgba(255,255,255,0.07)";
+      ctx.fill();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "700 28px -apple-system, system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText(`${p.from} → ${p.to}`, 80, y + (rowH-14)/2 + 10);
+
+      ctx.fillStyle = "#3ddc84";
+      ctx.font = "800 30px -apple-system, system-ui, sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText(`${p.amount.toFixed(2)} ₺`, W-80, y + (rowH-14)/2 + 11);
+
+      y += rowH;
+    });
+  }
+
+  return canvas;
+}
+
+async function shareBalanceCard(title, totals, payments){
+  try{
+    const canvas = buildShareCanvas("TAVLA", title, totals, payments);
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+    if (!blob){ alert("Görsel oluşturulamadı."); return; }
+    const file = new File([blob], "tavla-hesap.png", { type: "image/png" });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })){
+      await navigator.share({ files: [file], title: "Tavla Hesap Özeti" });
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "tavla-hesap.png";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(()=> URL.revokeObjectURL(url), 5000);
+      alert("Görsel indirildi. WhatsApp'tan resim olarak paylaşabilirsin.");
+    }
+  } catch(e){
+    if (e && e.name === "AbortError") return; // kullanıcı paylaşımı iptal etti
+    console.error(e);
+    alert("Paylaşım sırasında bir hata oluştu: " + e.message);
+  }
 }
 
 document.getElementById("closeSessionBtn2").addEventListener("click", ()=>{
@@ -908,7 +1058,7 @@ document.getElementById("shareWhatsappCloseBtn").addEventListener("click", ()=>{
   if (!s) return;
   const totals = computeSessionHandTotals(s);
   applyPaymentsToTotals(totals, pendingPayments);
-  shareViaWhatsApp(buildBalanceShareText(s.name, totals, pendingPayments));
+  shareBalanceCard(s.name, totals, pendingPayments);
 });
 
 function renderCloseSessionScreen(){
@@ -1522,7 +1672,7 @@ document.getElementById("deleteTotalsSessionBtn").addEventListener("click", ()=>
 document.getElementById("shareWhatsappTotalsBtn").addEventListener("click", ()=>{
   if (!lastTotalsShareData) return;
   const { title, totals, payments } = lastTotalsShareData;
-  shareViaWhatsApp(buildBalanceShareText(title, totals, payments));
+  shareBalanceCard(title, totals, payments);
 });
 
 function renderTotalsScreen(){
