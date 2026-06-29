@@ -758,12 +758,13 @@ document.getElementById("diceResetBtn").addEventListener("click", ()=>{
 
 /* ranking: en büyükten en küçüğe sıralanmış isim listesi.
    Kral = ranking[0]. Kuyruk = geri kalanların TERSİ (en küçük en önde).
-   5 kişide Kral'ın da bir yardımcısı olur (2'ye 3 oynanır): en küçük
-   atan rakip, ondan bir büyük olan (4'üncü en büyük) Kral'ın yardımcısı,
-   kalanlar rakibin ortağı.
-   Her el sonunda: oyunu (oturarak) kaybeden, SIRADAKİ elde doğrudan
-   Kral'ın yardımcısı olur. Eski yardımcı (kazansa da kaybetse de)
-   sıranın sonuna gider, böylece herkes sırayla rakip olma hakkını alır. */
+   4 KİŞİDE: Kral HEP TEK kalır, hiçbir zaman yardımcısı olmaz (kazansa
+   da kaybetse de). Rakip her elde değişir, kaybeden sıranın sonuna gider.
+   5 KİŞİDE: Kral'ın HER ZAMAN bir yardımcısı vardır (2'ye 3 oynanır).
+   İlk el: en küçük atan rakip, 4. en büyük (=2. en küçük) Kral'ın
+   yardımcısı, kalan 2 kişi rakibin ortağı. Sonraki her elde: oyunu
+   (oturarak) kaybeden, bir sonraki elde DOĞRUDAN kazananın (yeni Kral'ın)
+   yardımcısı olur; eski yardımcı sıranın sonuna gider. */
 function rotationFromRanking(ranking){
   const king = ranking[0];
   const rest = ranking.slice(1).reverse(); // [en küçük, ..., 2. en büyük]
@@ -791,11 +792,13 @@ function seatFromRotation(king, kingHelper, queue){
     partners: { A: partnersA, B: partnersB }
   };
 }
-/* Bir el bittiğinde sıradaki eli (yeni Kral/yardımcı/rakip/ortaklar) hesaplar. */
+/* Bir el bittiğinde sıradaki eli (yeni Kral/yardımcı/rakip/ortaklar) hesaplar.
+   t.usesKingHelper bu masanın 4'lü mü (hep tek) yoksa 5'li mi (hep
+   yardımcılı) kurulduğunu belirler ve bu özellik el boyunca sabit kalır. */
 function advanceRotation(t, winnerSide){
   const useHelper = !!t.usesKingHelper;
   const king = t.seated.A;
-  const kingHelper = t.rotation && t.rotation.kingHelper ? t.rotation.kingHelper : null;
+  const oldKingHelper = t.rotation && t.rotation.kingHelper ? t.rotation.kingHelper : null;
   const challenger = t.seated.B;
   const challengerHelpers = (t.rotation && t.rotation.queue ? t.rotation.queue.slice() : []); // bu elin rakip ortakları
 
@@ -808,11 +811,13 @@ function advanceRotation(t, winnerSide){
     seatedLoser = king;
   }
 
-  let newQueueForChallenger, newKingHelper;
+  let newKingHelper, newQueueForChallenger;
   if (useHelper){
-    newKingHelper = seatedLoser; // kaybeden oturan doğrudan yeni yardımcı olur
-    newQueueForChallenger = kingHelper ? challengerHelpers.concat([kingHelper]) : challengerHelpers.slice();
+    // 5 kişi: kaybeden oturan doğrudan yeni yardımcı olur, eski yardımcı sıranın sonuna gider.
+    newKingHelper = seatedLoser;
+    newQueueForChallenger = oldKingHelper ? challengerHelpers.concat([oldKingHelper]) : challengerHelpers.slice();
   } else {
+    // 4 kişi: Kral hep tek, yardımcı hiç yok. Kaybeden sıranın sonuna gider.
     newKingHelper = null;
     newQueueForChallenger = challengerHelpers.concat([seatedLoser]);
   }
