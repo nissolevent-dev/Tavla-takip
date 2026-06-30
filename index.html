@@ -358,6 +358,10 @@
           <button class="btn-main" id="aWinsBtn">A Kazandı</button>
           <button class="btn-main" id="bWinsBtn">B Kazandı</button>
         </div>
+        <div class="row" style="margin-top:8px;">
+          <button class="btn-soft" id="aMarsBtn">⭐ A Mars</button>
+          <button class="btn-soft" id="bMarsBtn">⭐ B Mars</button>
+        </div>
       </div>
 
       <div id="finishedPanel" style="display:none;">
@@ -1787,7 +1791,7 @@ document.getElementById("aWinsBtn").addEventListener("click", ()=>{
   try{
     const t = STATE.tables[currentTableId];
     if (!t || !t.game){ alert("Oyun verisi henüz yüklenmedi, lütfen tekrar deneyin."); return; }
-    finishHand(currentTableId, "A", t.game);
+    finishHand(currentTableId, "A", t.game, false);
   } catch(e){
     console.error(e);
     alert("El kapatılırken bir hata oluştu: " + e.message);
@@ -1797,7 +1801,27 @@ document.getElementById("bWinsBtn").addEventListener("click", ()=>{
   try{
     const t = STATE.tables[currentTableId];
     if (!t || !t.game){ alert("Oyun verisi henüz yüklenmedi, lütfen tekrar deneyin."); return; }
-    finishHand(currentTableId, "B", t.game);
+    finishHand(currentTableId, "B", t.game, false);
+  } catch(e){
+    console.error(e);
+    alert("El kapatılırken bir hata oluştu: " + e.message);
+  }
+});
+document.getElementById("aMarsBtn").addEventListener("click", ()=>{
+  try{
+    const t = STATE.tables[currentTableId];
+    if (!t || !t.game){ alert("Oyun verisi henüz yüklenmedi, lütfen tekrar deneyin."); return; }
+    finishHand(currentTableId, "A", t.game, true);
+  } catch(e){
+    console.error(e);
+    alert("El kapatılırken bir hata oluştu: " + e.message);
+  }
+});
+document.getElementById("bMarsBtn").addEventListener("click", ()=>{
+  try{
+    const t = STATE.tables[currentTableId];
+    if (!t || !t.game){ alert("Oyun verisi henüz yüklenmedi, lütfen tekrar deneyin."); return; }
+    finishHand(currentTableId, "B", t.game, true);
   } catch(e){
     console.error(e);
     alert("El kapatılırken bir hata oluştu: " + e.message);
@@ -1808,7 +1832,7 @@ document.getElementById("bWinsBtn").addEventListener("click", ()=>{
    Her ikili kendi son durumuna göre kapatılır:
    - Daha önce biri "görmedi" deyip kapanmışsa: o sabit değerle kaybeder.
    - Hâlâ açıksa: el kazananına göre, o ikilinin GÜNCEL puanıyla kapanır. */
-function finishHand(tableId, winnerSide, g){
+function finishHand(tableId, winnerSide, g, isMars){
   const t = STATE.tables[tableId];
   if (!t || !t.seated || !t.seated.A || !t.seated.B){
     throw new Error("Masa verisi eksik (oturanlar bulunamadı).");
@@ -1823,6 +1847,12 @@ function finishHand(tableId, winnerSide, g){
     results[winner].vs[loser] = (results[winner].vs[loser]||0) + amount;
     results[winner].total += amount;
   }
+  // Mars çarpanı: sadece oyun sonuna kadar açık kalan (hiç "Görmedi"
+  // demeyen) çiftlere uygulanır. "Görmedi" deyip kapanan çiftler
+  // (p.closed === true) mars'tan etkilenmez — kendi kapanma anındaki
+  // değerleri sabittir.
+  const marsMultiplier = isMars ? 2 : 1;
+
   Object.entries(g.pairs).forEach(([aName, oppMap])=>{
     Object.entries(oppMap).forEach(([bName, p])=>{
       if (p.closed){
@@ -1832,7 +1862,7 @@ function finishHand(tableId, winnerSide, g){
       } else {
         const winner = winnerSide === "A" ? aName : bName;
         const loser = winnerSide === "A" ? bName : aName;
-        addSettle(loser, winner, Math.pow(2, p.count) * unit);
+        addSettle(loser, winner, Math.pow(2, p.count) * unit * marsMultiplier);
       }
     });
   });
@@ -1846,11 +1876,12 @@ function finishHand(tableId, winnerSide, g){
 
   g.finished = true;
   g.winner = winnerSide;
+  g.mars = !!isMars;
   g.results = results;
 
   const gameNo = Object.keys(t.history||{}).length + 1;
   fbPush(`${tablesPath()}/${tableId}/history`, {
-    gameNo, winner: winnerSide, results, time: Date.now()
+    gameNo, winner: winnerSide, mars: !!isMars, results, time: Date.now()
   });
 
   let newRotation = null;
@@ -2027,7 +2058,7 @@ function renderTotalsScreen(){
       div.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
           <div>
-            <b>${escapeHtml(h.tname)}</b> · El ${h.gameNo} · ${h.winner} kazandı
+            <b>${escapeHtml(h.tname)}</b> · El ${h.gameNo} · ${h.winner} kazandı${h.mars ? ' <span style="color:var(--gold-dark);font-weight:800;">⭐ MARS</span>' : ''}
             <br><span class="small-note">${escapeHtml(resStr)}</span>
           </div>
           <button class="btn-danger btn-sm" style="flex:0 0 auto;">Sil</button>
