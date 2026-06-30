@@ -306,7 +306,7 @@
           <input type="text" id="addSessionPlayerInput" placeholder="Sonradan katılan oyuncu adı">
           <button class="btn-soft" id="addSessionPlayerBtn" style="flex:0 0 70px;">Ekle</button>
         </div>
-        <div class="small-note">Yeni eklenen oyuncu, sıradaki ilk rakip olarak rotasyona girer.</div>
+        <div class="small-note">Yeni eklenen oyuncu, sıradaki ilk rakip olarak rotasyona girer. Çıkarma/ekleme sadece eller arasında yapılabilir - canlı bir elde olan oyuncu önce o el bitirilmeden çıkarılamaz.</div>
         <div id="sessionPlayerListWrap" style="margin-top:10px;"></div>
       </div>
 
@@ -852,12 +852,27 @@ document.getElementById("startSessionBtn").addEventListener("click", ()=>{
 function renderSessionPlayerList(){
   const wrap = document.getElementById("sessionPlayerListWrap");
   const names = getSessionPlayerNames();
+  const s = STATE.sessions[STATE.activeSessionId];
+  const tables = (s && s.tables) || {};
+
+  // Şu an canlı (bitmemiş) bir elde yer alan isimleri topla.
+  const busyNames = new Set();
+  Object.values(tables).forEach(t=>{
+    if (t.game && !t.game.finished){
+      sideNames(t, "A").forEach(n=> busyNames.add(n));
+      sideNames(t, "B").forEach(n=> busyNames.add(n));
+    }
+  });
+
   wrap.innerHTML = "";
   names.forEach(name=>{
+    const isBusy = busyNames.has(name);
     const chip = document.createElement("div");
     chip.className = "chip";
-    chip.innerHTML = `<span>${escapeHtml(name)}</span><button data-name="${escapeHtml(name)}">×</button>`;
-    chip.querySelector("button").addEventListener("click", ()=> removeSessionPlayer(name));
+    chip.innerHTML = `<span>${escapeHtml(name)}</span><button data-name="${escapeHtml(name)}" ${isBusy ? 'disabled style="opacity:.35;"' : ''}>×</button>`;
+    if (!isBusy){
+      chip.querySelector("button").addEventListener("click", ()=> removeSessionPlayer(name));
+    }
     wrap.appendChild(chip);
   });
   if (!names.length){
@@ -885,78 +900,93 @@ function addSessionPlayerFromInput(){
   fbSet(`sessions/${sid}/activePlayers/${name}`, true);
   inp.value = "";
 
-  // Bu oyuncuyu, oturumdaki CANLI rotasyonlu masaların her birinde
-  // sıradaki ilk rakip olacak şekilde kuyruğun en başına ekle.
+  // Bu oyuncuyu, oturumdaki rotasyonlu masaların her birinde "sıradaki
+  // ilk rakip" olacak şekilde ekler. Mevcut elin oturanlarına (seated)
+  // dokunulmaz; sadece BİR SONRAKİ elin sırasına (rotation.fullOrder)
+  // dahil edilir - "Yeni El Başlat" tıklandığında bu listeye göre
+  // gerçek oturma düzeni kurulacaktır.
   Object.entries(s.tables||{}).forEach(([tid, t])=>{
-    if (t.usesRotation && t.rotation && t.rotation.king && t.game && !t.game.finished){
-      const newQueue = [name].concat(Array.isArray(t.rotation.queue) ? t.rotation.queue : []);
-      // Mevcut canlı elin oyuncu/skor durumuna dokunmuyoruz, sadece
-      // gelecekteki rotasyon sırasına ekliyoruz.
-      fbSet(`${tablesPath()}/${tid}/rotation`, {
-        king: t.rotation.king,
-        kingHelper: t.rotation.kingHelper || null,
-        queue: newQueue
-      });
+    if (!t.usesRotation || !t.rotation || !t.rotation.king) return;
+    if (Array.isArray(t.rotation.fullOrder)){
+      const newOrder = [name].concat(t.rotation.fullOrder);
+      fbSet(`${tablesPath()}/${tid}/rotation/fullOrder`, newOrder);
+    } else if (Array.isArray(t.rotation.queue)){
+      // Eski format (ilk kurulumdan kalma, henüz hiç el bitmemiş).
+      const newQueue = [name].concat(t.rotation.queue);
+      fbSet(`${tablesPath()}/${tid}/rotation/queue`, newQueue);
     }
   });
 }
 
-/* Bir rotasyon objesinden (king/kingHelper/queue) belirli bir ismi
-   tamamen eler ve kalan oyunculara göre yeni oturma düzenini hesaplar.
-   Hem "canlı eli bitirip sonra çıkar" hem "henüz bitmemiş eli direkt
-   yeniden kur" akışlarında ortak kullanılır. */
-function rotationWithoutName(rotation, name){
-  if (!rotation || !rotation.king) return null;
-  const remainingQueue = Array.isArray(rotation.queue) ? rotation.queue.filter(n=>n!==name) : [];
-  let king = rotation.king;
-  let kingHelper = rotation.kingHelper || null;
-  if (king === name){
-    king = (kingHelper && kingHelper !== name) ? kingHelper : remainingQueue.shift();
-    kingHelper = null;
-  } else if (kingHelper === name){
-    kingHelper = null;
+/* Bir masanın TAMAMINI (kayıtlı rotation bilgisine göre) tek bir
+   listede toplar, belirtilen ismi bu listeden tamamen eler ve
+   kalanlarla yeni bir "sıradaki tam liste" kurar. İki rotation formatını
+   da destekler: eski format (ilk kurulumdan kalma: king+kingHelper+
+   queue, + ayrıca t.seated.B) ve yeni format (el bittikten sonra
+   finishHand'in bıraktığı: king+fullOrder). */
+function rebuildRotationWithoutName(t, name){
+  if (!t.rotation || !t.rotation.king) return null;
+  let fullList;
+  if (Array.isArray(t.rotation.fullOrder)){
+    fullList = [t.rotation.king, ...t.rotation.fullOrder.filter(n=>n!==t.rotation.king)];
+  } else {
+    fullList = [t.rotation.king];
+    if (t.rotation.kingHelper) fullList.push(t.rotation.kingHelper);
+    if (t.seated && t.seated.B) fullList.push(t.seated.B); // mevcut challenger
+    if (Array.isArray(t.rotation.queue)) fullList.push(...t.rotation.queue);
   }
-  if (!king) return null; // oturumda kimse kalmadı
-  return seatFromRotation(king, kingHelper, remainingQueue);
+
+  const remaining = fullList.filter(n=>n!==name);
+  if (!remaining.length) return null; // oturumda kimse kalmadı
+
+  const newKing = remaining[0];
+  const newQueueFull = remaining.slice(1);
+  return seatFromRotation(newKing, null, newQueueFull);
 }
 
 function removeSessionPlayer(name){
   const sid = STATE.activeSessionId;
   const s = STATE.sessions[sid];
   if (!s) return;
-  if (!confirm(`${name} oturumdan çıkarılsın mı? Eğer şu an bir elde oturuyor/ortaksa, o el mevcut puanla bitirilip hesabına işlenecek.`)) return;
+
+  // Canlı (bitmemiş) bir elde oturuyor/ortaksa çıkarmaya izin verme -
+  // önce "A Kazandı"/"B Kazandı" ile o el kapatılmalı.
+  const liveTableNames = [];
+  Object.values(s.tables||{}).forEach(t=>{
+    if (t.game && !t.game.finished && sideOf(t, name)){
+      liveTableNames.push(t.name);
+    }
+  });
+  if (liveTableNames.length){
+    alert(`${name} şu an "${liveTableNames.join(", ")}" masasında devam eden bir elde yer alıyor. Önce o eli "A Kazandı" / "B Kazandı" ile bitirin, sonra oyuncuyu çıkarabilirsiniz.`);
+    return;
+  }
+
+  if (!confirm(`${name} oturumdan çıkarılsın mı?`)) return;
 
   try{
+    // Bu oyuncunun yer aldığı (ama artık canlı olmayan, yani el bitmiş
+    // veya hiç başlamamış) rotasyonlu masaları, kalan oyunculara göre
+    // yeniden kur. seated/partners de güncellenir ki masa listesinde
+    // doğru görünsün; ama gerçek "oturma" "Yeni El Başlat" anında
+    // GÜNCEL oyuncu listesiyle tekrar teyit edilerek kurulacaktır.
     Object.entries(s.tables||{}).forEach(([tid, t])=>{
-      const liveAndInvolved = t.game && !t.game.finished && sideOf(t, name);
-      // Bu masanın YENİ (henüz Firebase'e gitmemiş, lokal hesaplanan)
-      // rotasyonunu tutacağız - asenkron Firebase senkronizasyonunu
-      // beklemeden hemen üzerine doğru çıkarma işlemini uygulayabilmek için.
-      let pendingRotation = t.rotation;
-
-      if (liveAndInvolved){
-        // 1) Canlı eli, çıkan kişinin tarafı kaybetmiş sayarak o anki
-        //    değerle bitir (hesabına işlenir). finishHand, kendi içinde
-        //    hesapladığı YENİ rotasyonu doğrudan geri döndürür.
-        const winnerSide = sideOf(t, name) === "A" ? "B" : "A";
-        const result = finishHand(tid, winnerSide, t.game);
-        if (result) pendingRotation = result.rotation;
-      }
-
-      // 2) Rotasyonu (varsa) çıkan isimden tamamen arındır.
-      if (t.usesRotation && pendingRotation){
-        const next = rotationWithoutName(pendingRotation, name);
-        if (next){
-          fbUpdate(`${tablesPath()}/${tid}`, {
-            seated: next.seated,
-            partners: next.partners,
-            rotation: next.rotation
-          });
-        }
+      if (!t.usesRotation || !t.rotation) return;
+      const next = rebuildRotationWithoutName(t, name);
+      if (next){
+        const fullOrder = [];
+        if (next.rotation.kingHelper) fullOrder.push(next.rotation.kingHelper);
+        fullOrder.push(next.seated.B);
+        fullOrder.push(...next.rotation.queue);
+        fbUpdate(`${tablesPath()}/${tid}`, {
+          seated: next.seated,
+          partners: next.partners,
+          rotation: { king: next.rotation.king, fullOrder }
+        });
       }
     });
 
-    // 3) Oyuncuyu oturumdan çıkar.
+    // Oyuncuyu oturumdan çıkar.
     fbRemove(`sessions/${sid}/activePlayers/${name}`);
   } catch(e){
     console.error(e);
@@ -1429,12 +1459,21 @@ function rotationFromRanking(ranking){
    sayısına göre seatFromRotation içinde dinamik olarak belirlenir -
    böylece oturuma sonradan oyuncu eklenip çıkarılınca otomatik uyum
    sağlanır. */
+/* El bittiğinde, BİR SONRAKİ elin kimlerle oynanacağını DEĞİL, sadece
+   "sıradaki tam liste"yi (kim Kral, ondan sonra sırasıyla kim geliyor)
+   hesaplar. Gerçek seated/partners ataması ise "Yeni El Başlat"a
+   basıldığı anda (startGameForTable içinde, GÜNCEL oyuncu listesine
+   göre) yapılır - böylece arada oyuncu ekleme/çıkarma olursa otomatik
+   doğru yansır. */
 function advanceRotation(t, winnerSide){
-  const useHelper = !!t.usesKingHelper; // bu elin BAŞINDAKİ durum (kaybeden kim oldu, ona göre)
   const king = t.seated.A;
-  const oldKingHelper = t.rotation && t.rotation.kingHelper ? t.rotation.kingHelper : null;
   const challenger = t.seated.B;
-  const challengerHelpers = (t.rotation && t.rotation.queue ? t.rotation.queue.slice() : []); // bu elin rakip ortakları
+  // Bu elin ortakları HER ZAMAN t.partners'tan okunur (rotation
+  // objesinin formatı el bittikten sonra değişip {king,fullOrder}
+  // hâline geldiğinden, t.rotation.kingHelper/queue artık güvenilir
+  // değil - gerçek "bu elde kim kiminle" bilgisi partners'tadır).
+  const kingHelper = Object.keys((t.partners&&t.partners.A)||{})[0] || null;
+  const challengerHelpers = Object.keys((t.partners&&t.partners.B)||{});
 
   let newKing, seatedLoser;
   if (winnerSide === "A"){
@@ -1445,18 +1484,20 @@ function advanceRotation(t, winnerSide){
     seatedLoser = king;
   }
 
-  let newKingHelperWanted, newQueueFull;
-  if (useHelper){
-    // 5 kişi: kaybeden oturan doğrudan yeni yardımcı olur, eski yardımcı sıranın sonuna gider.
-    newKingHelperWanted = seatedLoser;
-    newQueueFull = oldKingHelper ? challengerHelpers.concat([oldKingHelper]) : challengerHelpers.slice();
-  } else {
-    // 4 kişi (veya yardımcısız): Kral hep tek. Kaybeden sıranın sonuna gider.
-    newKingHelperWanted = null;
-    newQueueFull = challengerHelpers.concat([seatedLoser]);
-  }
+  // Yeni "tam sıra listesi": KAYBEDEN EN SONDA olmalı (seatFromRotation
+  // otomatik yardımcı seçerken kuyruğun SON elemanını seçiyor - "kaybeden
+  // oturan doğrudan yeni yardımcı olur" kuralı budur). Bu elin diğer
+  // ortakları (challengerHelpers) ÖNCE gelir - böylece sırayla rakip
+  // olma hakkını alırlar. Eski yardımcı (kingHelper) ise EN BAŞA değil,
+  // bu ortakların ARDINDAN eklenir; aksi hâlde eski yardımcı hep
+  // kaybedenle yer değiştirip aynı iki kişi arasında sonsuz döngüye
+  // girer, diğerleri (Willy/Dani gibi) hiç sıraya giremez.
+  const fullOrder = [];
+  fullOrder.push(...challengerHelpers);
+  if (kingHelper) fullOrder.push(kingHelper);
+  fullOrder.push(seatedLoser); // EN SONDA - otomatik yardımcı seçilecek
 
-  return seatFromRotation(newKing, newKingHelperWanted, newQueueFull);
+  return { king: newKing, fullOrder };
 }
 
 document.getElementById("startDiceGameBtn").addEventListener("click", ()=>{
@@ -1480,18 +1521,50 @@ function startGameForTable(id){
     alert("Önce A ve B taraflarına oyuncu atayın.");
     return;
   }
-  if (t.usesRotation && (!t.rotation || !Array.isArray(t.rotation.queue))){
-    // Rotasyon verisi bozuk/eksik kalmışsa (örn. eski bir sürümden kalma
-    // veri), oturanlara göre minimal bir rotasyon yeniden kurarak devam et.
-    const partnersA = Object.keys((t.partners&&t.partners.A)||{});
-    const partnersB = Object.keys((t.partners&&t.partners.B)||{});
-    t.rotation = {
-      king: t.seated.A,
-      kingHelper: partnersA[0] || null,
-      queue: partnersB
-    };
+
+  let seated = t.seated;
+  let partners = t.partners;
+
+  if (t.usesRotation && t.rotation){
+    // rotation.fullOrder: bir önceki elin sonunda hesaplanan "kim Kral,
+    // sırasıyla kim geliyor" listesi. Bu liste, GÜNCEL oturum oyuncu
+    // listesiyle kesiştirilir (yani aradan çıkarılan biri varsa elenir;
+    // eklenen biri rotation.fullOrder'a zaten ek butonunda işlenmiştir).
+    // Böylece "Yeni El Başlat" anında oyuncu sayısı ne ise (4 veya 5),
+    // Kral/yardımcı kuralı ona göre doğru kurulur.
+    const sessionNames = new Set(getSessionPlayerNames());
+    let fullOrder;
+    if (Array.isArray(t.rotation.fullOrder)){
+      fullOrder = [t.rotation.king, ...t.rotation.fullOrder.filter(n=>n!==t.rotation.king)]
+        .filter(n=>sessionNames.has(n));
+    } else if (Array.isArray(t.rotation.queue)){
+      // Eski format (ilk kurulumdan kalma): king + kingHelper + queue.
+      fullOrder = [t.rotation.king];
+      if (t.rotation.kingHelper) fullOrder.push(t.rotation.kingHelper);
+      fullOrder.push(...t.rotation.queue);
+      fullOrder = fullOrder.filter(n=>sessionNames.has(n));
+    } else {
+      fullOrder = [t.seated.A, t.seated.B].filter(n=>sessionNames.has(n));
+    }
+
+    if (fullOrder.length < 2){
+      alert("Bu masada oynamaya devam edecek yeterli oyuncu kalmadı (en az 2 kişi gerekli).");
+      return;
+    }
+
+    const king = fullOrder[0];
+    const queueFull = fullOrder.slice(1);
+    const setup = seatFromRotation(king, null, queueFull);
+    seated = setup.seated;
+    partners = setup.partners;
+    fbUpdate(`${tablesPath()}/${id}`, {
+      seated: setup.seated,
+      partners: setup.partners,
+      rotation: setup.rotation
+    });
   }
-  const game = buildInitialGame(t.seated, t.partners);
+
+  const game = buildInitialGame(seated, partners);
   fbSet(`${tablesPath()}/${id}/game`, game);
   goScreen("s4", id);
 }
@@ -1764,6 +1837,13 @@ function finishHand(tableId, winnerSide, g){
     });
   });
 
+  // Bu el sırasında oturumdan çıkarılıp hesabı önceden sabitlenmiş
+  // oyuncular varsa (settlePlayerOutOfLiveHand), onları da nihai
+  // sonuçlara dahil et.
+  (g.settledOut||[]).forEach(({loser, winner, amount})=>{
+    addSettle(loser, winner, amount);
+  });
+
   g.finished = true;
   g.winner = winnerSide;
   g.results = results;
@@ -1775,13 +1855,17 @@ function finishHand(tableId, winnerSide, g){
 
   let newRotation = null;
   if (t.usesRotation){
+    // ÖNEMLİ: artık seated/partners burada DEĞİŞTİRİLMEZ. El bittiğinde
+    // masa "bitmiş" hâliyle (eski seated/partners ile) ekranda kalır;
+    // gerçek bir sonraki oturma düzeni sadece "Yeni El Başlat"a
+    // basıldığında (startGameForTable içinde) GÜNCEL oyuncu sayısına
+    // göre kurulur. Burada sadece "sıradaki tam liste" rotation alanına
+    // kaydedilir.
     const next = advanceRotation(t, winnerSide);
     newRotation = next;
     fbUpdate(`${tablesPath()}/${tableId}`, {
       game: g,
-      seated: next.seated,
-      partners: next.partners,
-      rotation: next.rotation
+      rotation: { king: next.king, fullOrder: next.fullOrder }
     });
   } else {
     fbSet(`${tablesPath()}/${tableId}/game`, g);
