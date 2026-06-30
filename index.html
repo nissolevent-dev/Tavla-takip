@@ -299,6 +299,17 @@
         <span class="session-label" id="sessionNameLabel"></span>
         <button class="btn-soft btn-sm" id="newTableBtn">+ Yeni Masa</button>
       </div>
+
+      <div class="card">
+        <h2>Oturumdaki Oyuncular</h2>
+        <div class="row">
+          <input type="text" id="addSessionPlayerInput" placeholder="Sonradan katılan oyuncu adı">
+          <button class="btn-soft" id="addSessionPlayerBtn" style="flex:0 0 70px;">Ekle</button>
+        </div>
+        <div class="small-note">Yeni eklenen oyuncu, sıradaki ilk rakip olarak rotasyona girer.</div>
+        <div id="sessionPlayerListWrap" style="margin-top:10px;"></div>
+      </div>
+
       <div id="tableListWrap"></div>
       <div class="empty-msg" id="noTableMsg">Henüz masa yok. "+ Yeni Masa" ile başlayın.</div>
       <button class="btn-soft btn-block" id="closeSessionBtn2" style="margin-top:16px;">Oturumu Kapat (Ödeme Gir)</button>
@@ -792,6 +803,7 @@ function renderSessionScreen(){
     renderSessionPlayerPick();
   } else {
     document.getElementById("sessionNameLabel").textContent = STATE.sessions[STATE.activeSessionId].name;
+    renderSessionPlayerList();
     renderTablesScreen();
   }
 }
@@ -835,6 +847,107 @@ document.getElementById("startSessionBtn").addEventListener("click", ()=>{
   forcingNewSession = false;
   sessionPlayerPick = {};
 });
+
+/* ===================== OTURUMA SONRADAN OYUNCU EKLE / ÇIKAR ===================== */
+function renderSessionPlayerList(){
+  const wrap = document.getElementById("sessionPlayerListWrap");
+  const names = getSessionPlayerNames();
+  wrap.innerHTML = "";
+  names.forEach(name=>{
+    const chip = document.createElement("div");
+    chip.className = "chip";
+    chip.innerHTML = `<span>${escapeHtml(name)}</span><button data-name="${escapeHtml(name)}">×</button>`;
+    chip.querySelector("button").addEventListener("click", ()=> removeSessionPlayer(name));
+    wrap.appendChild(chip);
+  });
+  if (!names.length){
+    wrap.innerHTML = `<div class="small-note">Oturumda oyuncu yok.</div>`;
+  }
+}
+
+document.getElementById("addSessionPlayerBtn").addEventListener("click", addSessionPlayerFromInput);
+document.getElementById("addSessionPlayerInput").addEventListener("keydown", e=>{
+  if (e.key === "Enter") addSessionPlayerFromInput();
+});
+function addSessionPlayerFromInput(){
+  const inp = document.getElementById("addSessionPlayerInput");
+  const name = inp.value.trim();
+  if (!name) return;
+  const sid = STATE.activeSessionId;
+  const s = STATE.sessions[sid];
+  if (!s) return;
+  if ((s.activePlayers||{})[name]){ alert(`${name} zaten oturumda.`); return; }
+
+  // genel oyuncu listesinde yoksa oraya da ekle
+  if (!Object.values(STATE.players).includes(name)){
+    fbPush("players", name);
+  }
+  fbSet(`sessions/${sid}/activePlayers/${name}`, true);
+  inp.value = "";
+
+  // Bu oyuncuyu, oturumdaki CANLI rotasyonlu masaların her birinde
+  // sıradaki ilk rakip olacak şekilde kuyruğun en başına ekle.
+  Object.entries(s.tables||{}).forEach(([tid, t])=>{
+    if (t.usesRotation && t.game && !t.game.finished){
+      const newQueue = [name].concat((t.rotation && t.rotation.queue) || []);
+      const updated = seatFromRotation(t.rotation.king, t.rotation.kingHelper, newQueue);
+      // Mevcut canlı elin oyuncu/skor durumuna dokunmuyoruz, sadece
+      // gelecekteki rotasyon sırasına ekliyoruz.
+      fbSet(`${tablesPath()}/${tid}/rotation`, {
+        king: t.rotation.king,
+        kingHelper: t.rotation.kingHelper,
+        queue: newQueue
+      });
+    }
+  });
+}
+
+function removeSessionPlayer(name){
+  const sid = STATE.activeSessionId;
+  const s = STATE.sessions[sid];
+  if (!s) return;
+  if (!confirm(`${name} oturumdan çıkarılsın mı? Eğer şu an bir elde oturuyor/ortaksa, o el mevcut puanla bitirilip hesabına işlenecek.`)) return;
+
+  // 1) Bu oyuncunun oturduğu/ortağı olduğu CANLI elleri o anki değerle bitir.
+  Object.entries(s.tables||{}).forEach(([tid, t])=>{
+    if (t.game && !t.game.finished){
+      const side = sideOf(t, name);
+      if (side){
+        // O elde oturan kazanan tarafı, çıkan kişinin tarafı kaybetmiş gibi belirle
+        // (oyun yarıda kesildiği için adil bir varsayım: karşı taraf kazanmış sayılır).
+        const winnerSide = side === "A" ? "B" : "A";
+        try { finishHand(tid, winnerSide, t.game); } catch(e){ console.error(e); }
+      }
+    }
+  });
+
+  // 2) Oyuncuyu oturumdan çıkar.
+  fbRemove(`sessions/${sid}/activePlayers/${name}`);
+
+  // 3) Bu oyuncunun kuyrukta/yardımcı/oturan olarak göründüğü rotasyonlu
+  //    masaları, kalan oyunculara göre yeniden kur (bir sonraki el için).
+  Object.entries(s.tables||{}).forEach(([tid, t])=>{
+    if (!t.usesRotation || !t.rotation) return;
+    const remainingQueue = (t.rotation.queue||[]).filter(n=>n!==name);
+    let king = t.rotation.king;
+    let kingHelper = t.rotation.kingHelper;
+    if (king === name){
+      // Kral çıktıysa, yardımcı varsa o yeni Kral olur, yoksa kuyruktan biri gelir.
+      king = kingHelper || remainingQueue[0];
+      if (kingHelper === king) kingHelper = null;
+      else remainingQueue.shift();
+    }
+    if (kingHelper === name) kingHelper = null;
+    if (!king) return; // oturumda kimse kalmadıysa dokunma
+
+    const next = seatFromRotation(king, kingHelper, remainingQueue);
+    fbUpdate(`${tablesPath()}/${tid}`, {
+      seated: next.seated,
+      partners: next.partners,
+      rotation: next.rotation
+    });
+  });
+}
 
 document.getElementById("deleteSessionBtn").addEventListener("click", ()=>{
   const s = STATE.sessions[STATE.activeSessionId];
@@ -1234,6 +1347,46 @@ document.getElementById("diceResetBtn").addEventListener("click", ()=>{
   renderDiceSetupView();
 });
 
+/* seatFromRotation: king + kuyruktaki herkesin toplamına göre KENDİSİ
+   karar verir (useHelper parametresi YOK artık - dinamik). Toplam
+   oyuncu sayısı (king + queue.length + kingHelper varsa) 5 ise Kral'ın
+   yardımcısı olur, değilse (4 veya başka sayılarda) Kral hep tek kalır.
+   Bu sayede oturuma sonradan oyuncu eklenip çıkarılınca kural anında
+   güncel oyuncu sayısına göre kendini ayarlar. */
+function seatFromRotation(king, kingHelperWanted, queueFull){
+  const totalPlayers = 1 + (kingHelperWanted ? 1 : 0) + queueFull.length;
+  const useHelper = totalPlayers === 5;
+  let kingHelper = null;
+  let queue = queueFull.slice();
+  if (useHelper){
+    // Kral'ın yardımcısı isteniyor ve mevcutsa onu kullan; yoksa
+    // kuyruktaki ikinci kişiyi (4. en büyük benzeri) yardımcı yap.
+    if (kingHelperWanted && queueFull.includes(kingHelperWanted)){
+      kingHelper = kingHelperWanted;
+      queue = queueFull.filter(n=>n!==kingHelperWanted);
+    } else if (kingHelperWanted){
+      kingHelper = kingHelperWanted;
+      // kingHelperWanted kuyrukta değilse (örn. yeni atandı), olduğu gibi kullan
+    } else if (queueFull.length >= 2){
+      // Otomatik yardımcı: kuyruktaki en büyük (sondaki) kişi - ilk
+      // kurulumda bu "4. en büyük" konumuna denk gelir.
+      kingHelper = queueFull[queueFull.length - 1];
+      queue = queueFull.slice(0, -1);
+    }
+  }
+  const challenger = queue[0];
+  const challengerHelpers = queue.slice(1);
+  const partnersA = {};
+  if (kingHelper) partnersA[kingHelper] = true;
+  const partnersB = {};
+  challengerHelpers.forEach(n=> partnersB[n] = true);
+  return {
+    rotation: { king, queue: challengerHelpers, kingHelper: kingHelper || null },
+    seated: { A: king, B: challenger },
+    partners: { A: partnersA, B: partnersB },
+    usesKingHelper: useHelper
+  };
+}
 /* ranking: en büyükten en küçüğe sıralanmış isim listesi. Kral = ranking[0].
    4 KİŞİDE: Kral HEP TEK kalır, hiçbir zaman yardımcısı olmaz (kazansa
    da kaybetse de). Rakip sırası: önce en küçük zar atan, sonra sırayla
@@ -1247,43 +1400,22 @@ document.getElementById("diceResetBtn").addEventListener("click", ()=>{
    yardımcısı olur; eski yardımcı sıranın sonuna gider. */
 function rotationFromRanking(ranking){
   const king = ranking[0];
-  const useHelper = ranking.length === 5;
-  let kingHelper = null;
-  let queueForChallenger;
-  if (useHelper){
-    const rest = ranking.slice(1).reverse(); // [en küçük, ..., 2. en büyük]
-    kingHelper = rest[1]; // 4. en büyük = 2. en küçük
-    queueForChallenger = [rest[0]].concat(rest.slice(2)); // rakip + kalan ortaklar
-  } else {
-    // 4 kişi (ve Kral hariç yardımcısız diğer durumlar): en küçük önde,
-    // ardından 2.,3.,... en büyükten en küçüğe doğru (DOĞAL sırada).
-    const nonKing = ranking.slice(1); // [2.en büyük, 3.en büyük, ..., en küçük]
-    const lowest = nonKing[nonKing.length - 1];
-    const restInOrder = nonKing.slice(0, -1); // [2.en büyük, 3.en büyük, ...]
-    queueForChallenger = [lowest].concat(restInOrder);
-  }
-  const setup = seatFromRotation(king, kingHelper, queueForChallenger);
-  setup.usesKingHelper = useHelper;
-  return setup;
-}
-function seatFromRotation(king, kingHelper, queue){
-  const challenger = queue[0];
-  const challengerHelpers = queue.slice(1);
-  const partnersA = {};
-  if (kingHelper) partnersA[kingHelper] = true;
-  const partnersB = {};
-  challengerHelpers.forEach(n=> partnersB[n] = true);
-  return {
-    rotation: { king, queue: challengerHelpers, kingHelper: kingHelper || null },
-    seated: { A: king, B: challenger },
-    partners: { A: partnersA, B: partnersB }
-  };
+  // Tüm geri kalanları: en küçük en önde, sonra 2.en büyük, 3.en büyük...
+  // (doğal sıra). seatFromRotation, toplam sayıya göre kendisi 5 kişi
+  // durumunda ikinciyi otomatik Kral yardımcısı yapar.
+  const nonKing = ranking.slice(1); // [2.en büyük, 3.en büyük, ..., en küçük]
+  const lowest = nonKing[nonKing.length - 1];
+  const restInOrder = nonKing.slice(0, -1); // [2.en büyük, 3.en büyük, ...]
+  const queueForChallenger = [lowest].concat(restInOrder);
+  return seatFromRotation(king, null, queueForChallenger);
 }
 /* Bir el bittiğinde sıradaki eli (yeni Kral/yardımcı/rakip/ortaklar) hesaplar.
-   t.usesKingHelper bu masanın 4'lü mü (hep tek) yoksa 5'li mi (hep
-   yardımcılı) kurulduğunu belirler ve bu özellik el boyunca sabit kalır. */
+   Yardımcı kuralı artık STATİK bir bayrak değil, o anki TOPLAM oyuncu
+   sayısına göre seatFromRotation içinde dinamik olarak belirlenir -
+   böylece oturuma sonradan oyuncu eklenip çıkarılınca otomatik uyum
+   sağlanır. */
 function advanceRotation(t, winnerSide){
-  const useHelper = !!t.usesKingHelper;
+  const useHelper = !!t.usesKingHelper; // bu elin BAŞINDAKİ durum (kaybeden kim oldu, ona göre)
   const king = t.seated.A;
   const oldKingHelper = t.rotation && t.rotation.kingHelper ? t.rotation.kingHelper : null;
   const challenger = t.seated.B;
@@ -1298,20 +1430,18 @@ function advanceRotation(t, winnerSide){
     seatedLoser = king;
   }
 
-  let newKingHelper, newQueueForChallenger;
+  let newKingHelperWanted, newQueueFull;
   if (useHelper){
     // 5 kişi: kaybeden oturan doğrudan yeni yardımcı olur, eski yardımcı sıranın sonuna gider.
-    newKingHelper = seatedLoser;
-    newQueueForChallenger = oldKingHelper ? challengerHelpers.concat([oldKingHelper]) : challengerHelpers.slice();
+    newKingHelperWanted = seatedLoser;
+    newQueueFull = oldKingHelper ? challengerHelpers.concat([oldKingHelper]) : challengerHelpers.slice();
   } else {
-    // 4 kişi: Kral hep tek, yardımcı hiç yok. Kaybeden sıranın sonuna gider.
-    newKingHelper = null;
-    newQueueForChallenger = challengerHelpers.concat([seatedLoser]);
+    // 4 kişi (veya yardımcısız): Kral hep tek. Kaybeden sıranın sonuna gider.
+    newKingHelperWanted = null;
+    newQueueFull = challengerHelpers.concat([seatedLoser]);
   }
 
-  const result = seatFromRotation(newKing, newKingHelper, newQueueForChallenger);
-  result.usesKingHelper = useHelper;
-  return result;
+  return seatFromRotation(newKing, newKingHelperWanted, newQueueFull);
 }
 
 document.getElementById("startDiceGameBtn").addEventListener("click", ()=>{
