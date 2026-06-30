@@ -902,51 +902,66 @@ function addSessionPlayerFromInput(){
   });
 }
 
+/* Bir rotasyon objesinden (king/kingHelper/queue) belirli bir ismi
+   tamamen eler ve kalan oyunculara göre yeni oturma düzenini hesaplar.
+   Hem "canlı eli bitirip sonra çıkar" hem "henüz bitmemiş eli direkt
+   yeniden kur" akışlarında ortak kullanılır. */
+function rotationWithoutName(rotation, name){
+  const remainingQueue = (rotation.queue||[]).filter(n=>n!==name);
+  let king = rotation.king;
+  let kingHelper = rotation.kingHelper;
+  if (king === name){
+    king = (kingHelper && kingHelper !== name) ? kingHelper : remainingQueue.shift();
+    kingHelper = null;
+  } else if (kingHelper === name){
+    kingHelper = null;
+  }
+  if (!king) return null; // oturumda kimse kalmadı
+  return seatFromRotation(king, kingHelper, remainingQueue);
+}
+
 function removeSessionPlayer(name){
   const sid = STATE.activeSessionId;
   const s = STATE.sessions[sid];
   if (!s) return;
   if (!confirm(`${name} oturumdan çıkarılsın mı? Eğer şu an bir elde oturuyor/ortaksa, o el mevcut puanla bitirilip hesabına işlenecek.`)) return;
 
-  // 1) Bu oyuncunun oturduğu/ortağı olduğu CANLI elleri o anki değerle bitir.
-  Object.entries(s.tables||{}).forEach(([tid, t])=>{
-    if (t.game && !t.game.finished){
-      const side = sideOf(t, name);
-      if (side){
-        // O elde oturan kazanan tarafı, çıkan kişinin tarafı kaybetmiş gibi belirle
-        // (oyun yarıda kesildiği için adil bir varsayım: karşı taraf kazanmış sayılır).
-        const winnerSide = side === "A" ? "B" : "A";
-        try { finishHand(tid, winnerSide, t.game); } catch(e){ console.error(e); }
+  try{
+    Object.entries(s.tables||{}).forEach(([tid, t])=>{
+      const liveAndInvolved = t.game && !t.game.finished && sideOf(t, name);
+      // Bu masanın YENİ (henüz Firebase'e gitmemiş, lokal hesaplanan)
+      // rotasyonunu tutacağız - asenkron Firebase senkronizasyonunu
+      // beklemeden hemen üzerine doğru çıkarma işlemini uygulayabilmek için.
+      let pendingRotation = t.rotation;
+
+      if (liveAndInvolved){
+        // 1) Canlı eli, çıkan kişinin tarafı kaybetmiş sayarak o anki
+        //    değerle bitir (hesabına işlenir). finishHand, kendi içinde
+        //    hesapladığı YENİ rotasyonu doğrudan geri döndürür.
+        const winnerSide = sideOf(t, name) === "A" ? "B" : "A";
+        const result = finishHand(tid, winnerSide, t.game);
+        if (result) pendingRotation = result.rotation;
       }
-    }
-  });
 
-  // 2) Oyuncuyu oturumdan çıkar.
-  fbRemove(`sessions/${sid}/activePlayers/${name}`);
-
-  // 3) Bu oyuncunun kuyrukta/yardımcı/oturan olarak göründüğü rotasyonlu
-  //    masaları, kalan oyunculara göre yeniden kur (bir sonraki el için).
-  Object.entries(s.tables||{}).forEach(([tid, t])=>{
-    if (!t.usesRotation || !t.rotation) return;
-    const remainingQueue = (t.rotation.queue||[]).filter(n=>n!==name);
-    let king = t.rotation.king;
-    let kingHelper = t.rotation.kingHelper;
-    if (king === name){
-      // Kral çıktıysa, yardımcı varsa o yeni Kral olur, yoksa kuyruktan biri gelir.
-      king = kingHelper || remainingQueue[0];
-      if (kingHelper === king) kingHelper = null;
-      else remainingQueue.shift();
-    }
-    if (kingHelper === name) kingHelper = null;
-    if (!king) return; // oturumda kimse kalmadıysa dokunma
-
-    const next = seatFromRotation(king, kingHelper, remainingQueue);
-    fbUpdate(`${tablesPath()}/${tid}`, {
-      seated: next.seated,
-      partners: next.partners,
-      rotation: next.rotation
+      // 2) Rotasyonu (varsa) çıkan isimden tamamen arındır.
+      if (t.usesRotation && pendingRotation){
+        const next = rotationWithoutName(pendingRotation, name);
+        if (next){
+          fbUpdate(`${tablesPath()}/${tid}`, {
+            seated: next.seated,
+            partners: next.partners,
+            rotation: next.rotation
+          });
+        }
+      }
     });
-  });
+
+    // 3) Oyuncuyu oturumdan çıkar.
+    fbRemove(`sessions/${sid}/activePlayers/${name}`);
+  } catch(e){
+    console.error(e);
+    alert("Oyuncu çıkarılırken bir hata oluştu: " + e.message);
+  }
 }
 
 document.getElementById("deleteSessionBtn").addEventListener("click", ()=>{
@@ -1747,8 +1762,10 @@ function finishHand(tableId, winnerSide, g){
     gameNo, winner: winnerSide, results, time: Date.now()
   });
 
+  let newRotation = null;
   if (t.usesRotation){
     const next = advanceRotation(t, winnerSide);
+    newRotation = next;
     fbUpdate(`${tablesPath()}/${tableId}`, {
       game: g,
       seated: next.seated,
@@ -1758,6 +1775,7 @@ function finishHand(tableId, winnerSide, g){
   } else {
     fbSet(`${tablesPath()}/${tableId}/game`, g);
   }
+  return newRotation;
 }
 
 function renderFinishedResults(t){
@@ -1776,7 +1794,12 @@ function renderFinishedResults(t){
 }
 
 document.getElementById("nextHandBtn").addEventListener("click", ()=>{
-  startGameForTable(currentTableId);
+  try{
+    startGameForTable(currentTableId);
+  } catch(e){
+    console.error(e);
+    alert("Yeni el başlatılırken bir hata oluştu: " + e.message);
+  }
 });
 
 /* ===================== SCREEN 6: TOTALS ===================== */
