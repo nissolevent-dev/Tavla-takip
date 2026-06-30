@@ -888,14 +888,13 @@ function addSessionPlayerFromInput(){
   // Bu oyuncuyu, oturumdaki CANLI rotasyonlu masaların her birinde
   // sıradaki ilk rakip olacak şekilde kuyruğun en başına ekle.
   Object.entries(s.tables||{}).forEach(([tid, t])=>{
-    if (t.usesRotation && t.game && !t.game.finished){
-      const newQueue = [name].concat((t.rotation && t.rotation.queue) || []);
-      const updated = seatFromRotation(t.rotation.king, t.rotation.kingHelper, newQueue);
+    if (t.usesRotation && t.rotation && t.rotation.king && t.game && !t.game.finished){
+      const newQueue = [name].concat(Array.isArray(t.rotation.queue) ? t.rotation.queue : []);
       // Mevcut canlı elin oyuncu/skor durumuna dokunmuyoruz, sadece
       // gelecekteki rotasyon sırasına ekliyoruz.
       fbSet(`${tablesPath()}/${tid}/rotation`, {
         king: t.rotation.king,
-        kingHelper: t.rotation.kingHelper,
+        kingHelper: t.rotation.kingHelper || null,
         queue: newQueue
       });
     }
@@ -907,9 +906,10 @@ function addSessionPlayerFromInput(){
    Hem "canlı eli bitirip sonra çıkar" hem "henüz bitmemiş eli direkt
    yeniden kur" akışlarında ortak kullanılır. */
 function rotationWithoutName(rotation, name){
-  const remainingQueue = (rotation.queue||[]).filter(n=>n!==name);
+  if (!rotation || !rotation.king) return null;
+  const remainingQueue = Array.isArray(rotation.queue) ? rotation.queue.filter(n=>n!==name) : [];
   let king = rotation.king;
-  let kingHelper = rotation.kingHelper;
+  let kingHelper = rotation.kingHelper || null;
   if (king === name){
     king = (kingHelper && kingHelper !== name) ? kingHelper : remainingQueue.shift();
     kingHelper = null;
@@ -1480,6 +1480,17 @@ function startGameForTable(id){
     alert("Önce A ve B taraflarına oyuncu atayın.");
     return;
   }
+  if (t.usesRotation && (!t.rotation || !Array.isArray(t.rotation.queue))){
+    // Rotasyon verisi bozuk/eksik kalmışsa (örn. eski bir sürümden kalma
+    // veri), oturanlara göre minimal bir rotasyon yeniden kurarak devam et.
+    const partnersA = Object.keys((t.partners&&t.partners.A)||{});
+    const partnersB = Object.keys((t.partners&&t.partners.B)||{});
+    t.rotation = {
+      king: t.seated.A,
+      kingHelper: partnersA[0] || null,
+      queue: partnersB
+    };
+  }
   const game = buildInitialGame(t.seated, t.partners);
   fbSet(`${tablesPath()}/${id}/game`, game);
   goScreen("s4", id);
@@ -1509,7 +1520,7 @@ function renderGameScreen(){
     unitNote.classList.add("warn");
   }
 
-  if (t.usesRotation && t.rotation){
+  if (t.usesRotation && t.rotation && Array.isArray(t.rotation.queue)){
     document.getElementById("rotationNote").style.display = "block";
     const helperTxt = t.rotation.kingHelper ? ` (yardımcısı: ${t.rotation.kingHelper})` : "";
     document.getElementById("rotationNote").textContent =
