@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Tavla">
@@ -248,7 +250,7 @@
 
 <header>
   <h1>TAVLA</h1>
-  <small>ORTAKLI TAKİP</small>
+  <small>ORTAKLI TAKİP v2</small>
 </header>
 
 <div class="wrap">
@@ -472,7 +474,7 @@
 </div>
 
 <!-- OTOMATİK VİDO MODALI -->
-<div id="autoVidoOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px;">
+<div id="autoVidoOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;padding:20px;">
   <div style="background:#fff;border-radius:16px;padding:22px 20px;max-width:300px;width:100%;">
     <h2 style="margin:0 0 8px;font-size:14px;color:var(--gold-dark);text-transform:uppercase;font-weight:700;letter-spacing:.5px;">🎲 Otomatik Vido</h2>
     <div id="autoVidoStep1">
@@ -810,9 +812,11 @@ document.getElementById("pwModalConfirm").addEventListener("click", ()=>{
 
 /* ===================== OTOMATİK VİDO MODALI ===================== */
 let autoVidoDigit = 0;
+let autoVidoCallback = null; // null = launchDiceGame, fn = nextHand
 
-function openAutoVidoModal(){
+function openAutoVidoModal(onConfirm){
   autoVidoDigit = 0;
+  autoVidoCallback = onConfirm || null;
   document.getElementById("autoVidoStep1").style.display = "block";
   document.getElementById("autoVidoStep2").style.display = "none";
   document.getElementById("autoVidoOverlay").style.display = "flex";
@@ -853,8 +857,10 @@ function buildAutoVidoKeypad(){
 }
 
 document.getElementById("autoVidoNo").addEventListener("click", ()=>{
+  const cb = autoVidoCallback;
   closeAutoVidoModal();
-  launchDiceGame(0);
+  if (cb) cb(0);
+  else launchDiceGame(0);
 });
 document.getElementById("autoVidoYes").addEventListener("click", ()=>{
   autoVidoDigit = 0;
@@ -869,8 +875,11 @@ document.getElementById("autoVidoBack").addEventListener("click", ()=>{
 });
 document.getElementById("autoVidoConfirm").addEventListener("click", ()=>{
   if (autoVidoDigit < 1){ alert("En az 1 vido girin."); return; }
+  const count = autoVidoDigit;
+  const cb = autoVidoCallback;
   closeAutoVidoModal();
-  launchDiceGame(autoVidoDigit);
+  if (cb) cb(count);
+  else launchDiceGame(count);
 });
 
 document.getElementById("addPlayerBtn").addEventListener("click", addPlayerFromInput);
@@ -1624,7 +1633,8 @@ document.getElementById("startDiceGameBtn").addEventListener("click", ()=>{
   openAutoVidoModal();
 });
 
-function startGameForTable(id){
+function startGameForTable(id, autoVidoCount){
+  autoVidoCount = autoVidoCount || 0;
   const t = STATE.tables[id];
   if (!t || !t.seated || !t.seated.A || !t.seated.B){
     alert("Önce A ve B taraflarına oyuncu atayın.");
@@ -1674,10 +1684,14 @@ function startGameForTable(id){
   }
 
   const game = buildInitialGame(seated, partners);
+  if (autoVidoCount > 0){
+    Object.values(game.pairs).forEach(oppMap=>{
+      Object.values(oppMap).forEach(p=>{ p.count = autoVidoCount; });
+    });
+  }
   fbSet(`${tablesPath()}/${id}/game`, game);
   goScreen("s4", id);
 }
-
 
 document.getElementById("editSeatsBtn").addEventListener("click", ()=>{
   const t = STATE.tables[currentTableId];
@@ -2025,12 +2039,14 @@ function renderFinishedResults(t){
 }
 
 document.getElementById("nextHandBtn").addEventListener("click", ()=>{
-  try{
-    startGameForTable(currentTableId);
-  } catch(e){
-    console.error(e);
-    alert("Yeni el başlatılırken bir hata oluştu: " + e.message);
-  }
+  openAutoVidoModal((count)=> {
+    try{
+      startGameForTable(currentTableId, count);
+    } catch(e){
+      console.error(e);
+      alert("Yeni el başlatılırken bir hata oluştu: " + e.message);
+    }
+  });
 });
 
 /* ===================== SCREEN 6: TOTALS ===================== */
