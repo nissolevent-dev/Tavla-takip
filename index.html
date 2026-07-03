@@ -496,6 +496,18 @@
   </div>
 </div>
 
+<!-- FORMAT SEÇİM MODALI (4 kişide) -->
+<div id="formatModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:16px;padding:22px 20px;max-width:300px;width:100%;">
+    <h2 style="margin:0 0 8px;font-size:14px;color:var(--gold-dark);text-transform:uppercase;font-weight:700;letter-spacing:.5px;">Oyun Formatı</h2>
+    <div class="small-note" style="margin-bottom:18px;">4 kişiyle nasıl oynanacak?</div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button class="btn-main" id="format1v3Btn">1'e 3 — Kral tek, 3 rakip</button>
+      <button class="btn-soft" id="format2v2Btn">2'ye 2 — Ortaklı</button>
+    </div>
+  </div>
+</div>
+
 <div class="tabbar">
   <button data-go="s1" id="tabPlayers">OYUNCULAR</button>
   <button data-go="s2" id="tabTables">MASALAR</button>
@@ -1604,11 +1616,96 @@ function advanceRotation(t, winnerSide){
 /* Zar sırası onaylandıktan sonra gerçek oyunu Firebase'e yazar.
    autoVidoCount: kaç otomatik vido var (0 = normal başlangıç,
    1 = x2, 2 = x4, 3 = x8, …) */
+/* ===================== 2'YE 2 ROTASYON =====================
+   İlk el: R1+R3 (A) vs R2+R4 (B) — en büyük+3.büyük vs 2.büyük+en küçük.
+   Kural (1'e 3 ile aynı mantık):
+   - Kazanan oturan (Kral) masada kalır, kaybeden oturan onun yeni ortağı olur.
+   - Kaybeden ortağı sıranın sonuna gider.
+   - Kuyruktan sıradaki kişi yeni oturan rakip (B) olur, onun da sıradaki
+     kuyruk arkadaşı otomatik ortak olur.
+   Her zaman 2'ye 2 formatında kalır. */
+function rotationFromRanking_2v2(ranking){
+  // ranking: [R1(en büyük), R2, R3, R4(en küçük)]
+  // İlk el: A = R1+R3, B = R4+R2
+  // fullOrder: [R1, R3, R2, R4] — R1 kral, R3 onun ortağı, sonra R2, R4
+  return {
+    seated: { A: ranking[0], B: ranking[3] },
+    partners: { A: { [ranking[2]]: true }, B: { [ranking[1]]: true } },
+    rotation: { king: ranking[0], fullOrder: [ranking[2], ranking[1], ranking[3]], format: "2v2" },
+    usesKingHelper: true,
+    format: "2v2"
+  };
+}
+
+function advanceRotation_2v2(t, winnerSide){
+  const king = t.seated.A;
+  const challenger = t.seated.B;
+  const kingHelper = Object.keys((t.partners&&t.partners.A)||{})[0] || null;
+  const challengerHelper = Object.keys((t.partners&&t.partners.B)||{})[0] || null;
+
+  let newKing, seatedLoser, loserHelper, winnerHelper;
+  if (winnerSide === "A"){
+    newKing = king;
+    winnerHelper = kingHelper;     // kazanan ortağı kalır
+    seatedLoser = challenger;       // rakip oturan yeni yardımcı olur
+    loserHelper = challengerHelper; // rakip ortağı kuyruğa gider
+  } else {
+    newKing = challenger;
+    winnerHelper = challengerHelper;
+    seatedLoser = king;
+    loserHelper = kingHelper;
+  }
+
+  // fullOrder: yeni Kral'ın ortağı (kazanan ortak), ardından kuyruktan
+  // gelecek kişi/kişiler, en sonda kaybeden (yeni Kral'ın ortağı olacak).
+  // kuyruktan gelecek yeni rakip = fullOrder'ın başındaki kişi (startGameForTable'da).
+  const fullOrder = [];
+  if (winnerHelper) fullOrder.push(winnerHelper); // kazanan ortağı (bir sonraki elde de Kral'ın ortağı)
+  if (loserHelper) fullOrder.push(loserHelper);   // kuyruktan gelecek yeni rakibin ortağı
+  fullOrder.push(seatedLoser);                     // kaybeden = yeni Kral'ın yardımcısı (EN SONDA)
+
+  return { king: newKing, fullOrder, format: "2v2" };
+}
+
+function seat2v2FromRotation(king, fullOrder){
+  // fullOrder: [kazanan ortak, rakibin ortağı, kaybeden (yeni kral yardımcısı)]
+  // Ama startGameForTable'da fullOrder [king, ...rest] şeklinde geliyor.
+  // rest = [kazananOrtak, rakipOrtağı, kaybeden]
+  // Yeni el: A = king + rest[2](kaybeden=yardımcı), B = rest[0](kuyruk=rakip) + rest[1]
+  const [kingHelper, challengerHelper, newChallenger] = fullOrder;
+  // Aslında fullOrder = [kazananOrtak, loserHelper, seatedLoser]
+  // Sıradaki rakip (B oturan) = loserHelper'dan sonra kuyruktan gelmeli
+  // Ama bizim 2v2 rotasyonumuzda:
+  // fullOrder[0] = winnerHelper (kral ortağı kalır)
+  // fullOrder[1] = loserHelper (yeni rakibin ortağı)
+  // fullOrder[2] = seatedLoser (yeni kral yardımcısı)
+  return {
+    seated: { A: king, B: fullOrder[1] },
+    partners: { A: { [fullOrder[2]]: true }, B: { [fullOrder[0]]: true } }
+  };
+}
+
+let pendingFormat = null; // "1v3" veya "2v2"
+
+function openFormatModal(onSelect){
+  document.getElementById("formatModalOverlay").style.display = "flex";
+  document.getElementById("format1v3Btn").onclick = ()=>{
+    document.getElementById("formatModalOverlay").style.display = "none";
+    onSelect("1v3");
+  };
+  document.getElementById("format2v2Btn").onclick = ()=>{
+    document.getElementById("formatModalOverlay").style.display = "none";
+    onSelect("2v2");
+  };
+}
+
 function launchDiceGame(autoVidoCount){
   if (dicePick.ranking.length < 2) return;
-  const setup = rotationFromRanking(dicePick.ranking);
+  const fmt = pendingFormat || "1v3";
+  const setup = fmt === "2v2"
+    ? rotationFromRanking_2v2(dicePick.ranking)
+    : rotationFromRanking(dicePick.ranking);
   const game = buildInitialGame(setup.seated, setup.partners);
-  // Tüm çiftlerin başlangıç count'unu otomatik vido sayısı kadar ilerlet.
   if (autoVidoCount > 0){
     Object.values(game.pairs).forEach(oppMap=>{
       Object.values(oppMap).forEach(p=>{ p.count = autoVidoCount; });
@@ -1620,6 +1717,7 @@ function launchDiceGame(autoVidoCount){
     rotation: setup.rotation,
     usesRotation: true,
     usesKingHelper: setup.usesKingHelper,
+    format: fmt,
     game
   });
   goScreen("s4", currentTableId);
@@ -1630,7 +1728,15 @@ document.getElementById("startDiceGameBtn").addEventListener("click", ()=>{
     alert("Lütfen önce tüm oyuncuları sıralayın.");
     return;
   }
-  openAutoVidoModal();
+  if (dicePick.ranking.length === 4){
+    openFormatModal((fmt)=>{
+      pendingFormat = fmt;
+      openAutoVidoModal();
+    });
+  } else {
+    pendingFormat = "1v3";
+    openAutoVidoModal();
+  }
 });
 
 function startGameForTable(id, autoVidoCount){
@@ -1673,14 +1779,29 @@ function startGameForTable(id, autoVidoCount){
 
     const king = fullOrder[0];
     const queueFull = fullOrder.slice(1);
-    const setup = seatFromRotation(king, null, queueFull);
-    seated = setup.seated;
-    partners = setup.partners;
-    fbUpdate(`${tablesPath()}/${id}`, {
-      seated: setup.seated,
-      partners: setup.partners,
-      rotation: setup.rotation
-    });
+
+    let setup;
+    if ((t.format || t.rotation.format) === "2v2"){
+      // 2'ye 2 formatı: fullOrder = [king, yardımcı, rakipOrtağı, rakip]
+      // seat2v2FromRotation bunu 2x2 oturumuna dönüştürür.
+      setup = seat2v2FromRotation(king, queueFull);
+      seated = setup.seated;
+      partners = setup.partners;
+      fbUpdate(`${tablesPath()}/${id}`, {
+        seated: setup.seated,
+        partners: setup.partners,
+        rotation: { king, fullOrder: queueFull, format: "2v2" }
+      });
+    } else {
+      setup = seatFromRotation(king, null, queueFull);
+      seated = setup.seated;
+      partners = setup.partners;
+      fbUpdate(`${tablesPath()}/${id}`, {
+        seated: setup.seated,
+        partners: setup.partners,
+        rotation: setup.rotation
+      });
+    }
   }
 
   const game = buildInitialGame(seated, partners);
@@ -2011,11 +2132,13 @@ function finishHand(tableId, winnerSide, g, isMars){
     // basıldığında (startGameForTable içinde) GÜNCEL oyuncu sayısına
     // göre kurulur. Burada sadece "sıradaki tam liste" rotation alanına
     // kaydedilir.
-    const next = advanceRotation(t, winnerSide);
+    const next = t.format === "2v2"
+      ? advanceRotation_2v2(t, winnerSide)
+      : advanceRotation(t, winnerSide);
     newRotation = next;
     fbUpdate(`${tablesPath()}/${tableId}`, {
       game: g,
-      rotation: { king: next.king, fullOrder: next.fullOrder }
+      rotation: { king: next.king, fullOrder: next.fullOrder, format: t.format || "1v3" }
     });
   } else {
     fbSet(`${tablesPath()}/${tableId}/game`, g);
