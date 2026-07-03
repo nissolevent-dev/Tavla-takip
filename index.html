@@ -1617,7 +1617,10 @@ function launchDiceGame(autoVidoCount){
 }
 
 document.getElementById("startDiceGameBtn").addEventListener("click", ()=>{
-  if (dicePick.ranking.length < 2) return;
+  if (dicePick.ranking.length < 2){
+    alert("Lütfen önce tüm oyuncuları sıralayın.");
+    return;
+  }
   openAutoVidoModal();
 });
 
