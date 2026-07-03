@@ -471,6 +471,29 @@
   </div>
 </div>
 
+<!-- OTOMATİK VİDO MODALI -->
+<div id="autoVidoOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:16px;padding:22px 20px;max-width:300px;width:100%;">
+    <h2 style="margin:0 0 8px;font-size:14px;color:var(--gold-dark);text-transform:uppercase;font-weight:700;letter-spacing:.5px;">🎲 Otomatik Vido</h2>
+    <div id="autoVidoStep1">
+      <div class="small-note" style="margin-bottom:16px;">Bu elde başlangıçta otomatik vido var mı?</div>
+      <div class="row">
+        <button class="btn-soft" id="autoVidoNo">Yok — Normal Başlat</button>
+        <button class="btn-main" id="autoVidoYes" style="margin-top:0;">Var</button>
+      </div>
+    </div>
+    <div id="autoVidoStep2" style="display:none;">
+      <div class="small-note" style="margin-bottom:4px;">Kaç otomatik vido var?</div>
+      <div class="small-note" style="margin-bottom:14px;color:var(--gold-dark);font-weight:700;" id="autoVidoPreview"></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px;" id="autoVidoKeypad"></div>
+      <div class="row" style="margin-top:14px;">
+        <button class="btn-soft" id="autoVidoBack">← Geri</button>
+        <button class="btn-main" id="autoVidoConfirm" style="margin-top:0;">Başlat</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="tabbar">
   <button data-go="s1" id="tabPlayers">OYUNCULAR</button>
   <button data-go="s2" id="tabTables">MASALAR</button>
@@ -783,6 +806,71 @@ document.getElementById("pwModalConfirm").addEventListener("click", ()=>{
     pwEnteredDigits = "";
     renderPwDots();
   }
+});
+
+/* ===================== OTOMATİK VİDO MODALI ===================== */
+let autoVidoDigit = 0;
+
+function openAutoVidoModal(){
+  autoVidoDigit = 0;
+  document.getElementById("autoVidoStep1").style.display = "block";
+  document.getElementById("autoVidoStep2").style.display = "none";
+  document.getElementById("autoVidoOverlay").style.display = "flex";
+}
+function closeAutoVidoModal(){
+  document.getElementById("autoVidoOverlay").style.display = "none";
+}
+function renderAutoVidoPreview(){
+  const count = autoVidoDigit;
+  const multiplier = Math.pow(2, count);
+  document.getElementById("autoVidoPreview").textContent =
+    count === 0
+      ? "0 vido → normal başlar (x1)"
+      : `${count} vido → ${multiplier}x başlar`;
+}
+function buildAutoVidoKeypad(){
+  const kp = document.getElementById("autoVidoKeypad");
+  if (kp.childElementCount) return;
+  const keys = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
+  keys.forEach(k=>{
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "pw-key" + (k==="" ? " pw-key-empty" : "");
+    btn.textContent = k;
+    if (k !== ""){
+      btn.addEventListener("click", ()=>{
+        if (k === "⌫"){
+          autoVidoDigit = 0;
+        } else {
+          const n = parseInt(k);
+          if (n >= 1 && n <= 9) autoVidoDigit = n; // tek hane, 1-9 arası
+        }
+        renderAutoVidoPreview();
+      });
+    }
+    kp.appendChild(btn);
+  });
+}
+
+document.getElementById("autoVidoNo").addEventListener("click", ()=>{
+  closeAutoVidoModal();
+  launchDiceGame(0);
+});
+document.getElementById("autoVidoYes").addEventListener("click", ()=>{
+  autoVidoDigit = 0;
+  document.getElementById("autoVidoStep1").style.display = "none";
+  document.getElementById("autoVidoStep2").style.display = "block";
+  buildAutoVidoKeypad();
+  renderAutoVidoPreview();
+});
+document.getElementById("autoVidoBack").addEventListener("click", ()=>{
+  document.getElementById("autoVidoStep1").style.display = "block";
+  document.getElementById("autoVidoStep2").style.display = "none";
+});
+document.getElementById("autoVidoConfirm").addEventListener("click", ()=>{
+  if (autoVidoDigit < 1){ alert("En az 1 vido girin."); return; }
+  closeAutoVidoModal();
+  launchDiceGame(autoVidoDigit);
 });
 
 document.getElementById("addPlayerBtn").addEventListener("click", addPlayerFromInput);
@@ -1504,10 +1592,19 @@ function advanceRotation(t, winnerSide){
   return { king: newKing, fullOrder };
 }
 
-document.getElementById("startDiceGameBtn").addEventListener("click", ()=>{
+/* Zar sırası onaylandıktan sonra gerçek oyunu Firebase'e yazar.
+   autoVidoCount: kaç otomatik vido var (0 = normal başlangıç,
+   1 = x2, 2 = x4, 3 = x8, …) */
+function launchDiceGame(autoVidoCount){
   if (dicePick.ranking.length < 2) return;
   const setup = rotationFromRanking(dicePick.ranking);
   const game = buildInitialGame(setup.seated, setup.partners);
+  // Tüm çiftlerin başlangıç count'unu otomatik vido sayısı kadar ilerlet.
+  if (autoVidoCount > 0){
+    Object.values(game.pairs).forEach(oppMap=>{
+      Object.values(oppMap).forEach(p=>{ p.count = autoVidoCount; });
+    });
+  }
   fbUpdate(`${tablesPath()}/${currentTableId}`, {
     seated: setup.seated,
     partners: setup.partners,
@@ -1517,6 +1614,11 @@ document.getElementById("startDiceGameBtn").addEventListener("click", ()=>{
     game
   });
   goScreen("s4", currentTableId);
+}
+
+document.getElementById("startDiceGameBtn").addEventListener("click", ()=>{
+  if (dicePick.ranking.length < 2) return;
+  openAutoVidoModal();
 });
 
 function startGameForTable(id){
