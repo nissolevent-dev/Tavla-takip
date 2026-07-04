@@ -1452,7 +1452,32 @@ function renderTablesScreen(){
 }
 
 function loadSetupPickFromTable(t){
-  dicePick = { ranking:[] };
+  // Mevcut masanın tam oyuncu sırasını yeniden kurup zar ekranına yükle.
+  // rotation.fullOrder = [B-helpers..., kingHelper?, challenger]
+  // Kral (seated.A) en büyük olduğuna göre sıra: [king, ...fullOrder] ters okununca elde edilir.
+  // Ama asıl sıra: king=1, fullOrder'ın son elemanı=2 (challenger), önündekiler sırayla.
+  // Basitçe: king en başa, sonra fullOrder'ı ters çevir (en son challenger=2.büyük olmayabilir).
+  // Daha doğrusu: king + fullOrder aynen sıra (king=1.büyük, fullOrder[son]=challenger=2.büyük gibi değil).
+  // fullOrder zaten doğru rotasyon sırasını tutuyor: sırayla rakip gelecekler.
+  // Zar ekranı için king'i en başa, geri kalanları fullOrder sırasıyla göster.
+  if (t && t.rotation && t.rotation.king){
+    const king = t.rotation.king;
+    let rest = [];
+    if (Array.isArray(t.rotation.fullOrder) && t.rotation.fullOrder.length > 0){
+      // fullOrder'ın son elemanı şu anki challenger (en son eklenen = en küçük başlangıçta).
+      // Zar sırası: king=en büyük, sonra fullOrder tersten gelir mi? Hayır, doğrudan kullan.
+      rest = t.rotation.fullOrder.slice();
+    } else if (Array.isArray(t.rotation.queue)){
+      if (t.rotation.kingHelper) rest.push(t.rotation.kingHelper);
+      rest.push(...t.rotation.queue);
+      if (t.seated && t.seated.B) rest.push(t.seated.B);
+    }
+    // Tekrarları kaldır, king'i başa koy
+    const all = [king, ...rest.filter(n=>n!==king)];
+    dicePick = { ranking: all };
+  } else {
+    dicePick = { ranking: [] };
+  }
 }
 
 /* ===================== SCREEN 3: TABLE SETUP (ZAR SIRASINA GÖRE) =====================
@@ -1875,6 +1900,16 @@ function renderGameScreen(){
   const finished = !!g.finished;
   document.getElementById("liveControls").style.display = finished ? "none" : "block";
   document.getElementById("finishedPanel").style.display = finished ? "block" : "none";
+
+  // Kazanma butonlarına oturanların adını yaz
+  if (!finished && t.seated){
+    const nameA = t.seated.A || "A";
+    const nameB = t.seated.B || "B";
+    document.getElementById("aWinsBtn").textContent = nameA + " Kazandı";
+    document.getElementById("bWinsBtn").textContent = nameB + " Kazandı";
+    document.getElementById("aMarsBtn").textContent = "⭐ " + nameA + " Mars";
+    document.getElementById("bMarsBtn").textContent = "⭐ " + nameB + " Mars";
+  }
 
   if (finished) renderFinishedResults(t);
 
