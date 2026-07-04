@@ -1581,12 +1581,35 @@ function rotationFromRanking(ranking){
 function advanceRotation(t, winnerSide){
   const king = t.seated.A;
   const challenger = t.seated.B;
-  // Bu elin ortakları HER ZAMAN t.partners'tan okunur (rotation
-  // objesinin formatı el bittikten sonra değişip {king,fullOrder}
-  // hâline geldiğinden, t.rotation.kingHelper/queue artık güvenilir
-  // değil - gerçek "bu elde kim kiminle" bilgisi partners'tadır).
-  const kingHelper = Object.keys((t.partners&&t.partners.A)||{})[0] || null;
-  const challengerHelpers = Object.keys((t.partners&&t.partners.B)||{});
+
+  // Ortakların SIRASI kritik — Object.keys(partners.B) Firebase'den
+  // gelirken sıra garantisi yok, bu yüzden önceki rotation.fullOrder'dan
+  // türetiyoruz: orada sıra kayıtlı ve korunuyor.
+  // fullOrder = [challengerHelpers..., kingHelper?, seatedLoser(en sonda)]
+  // Şimdiki el için: king=fullOrder'da yok (zaten kral), challenger da yok
+  // (o ayrı), fullOrder'dan kim kim belli.
+  let prevFullOrder = Array.isArray(t.rotation && t.rotation.fullOrder)
+    ? t.rotation.fullOrder.slice()
+    : null;
+
+  // prevFullOrder = [...challengerHelpers, kingHelper?, seatedLoser]
+  // yani son eleman = bu elin seated.B veya seated.A (kaybeden oturan)
+  // Bu listeden sırayı kullanıyoruz. Eğer yoksa (ilk el veya eski format),
+  // partners'tan okuyoruz.
+  let kingHelper, challengerHelpers;
+  if (prevFullOrder){
+    // prevFullOrder'ın son elemanı bu elin kaybeden oturanıydı (ya da kral tarafı)
+    // Ama biz şu elin partners'ını biliyoruz: prevFullOrder'dan bu elin
+    // partners.A ve partners.B'yi çıkar
+    const partnersASet = new Set(Object.keys((t.partners&&t.partners.A)||{}));
+    const partnersBSet = new Set(Object.keys((t.partners&&t.partners.B)||{}));
+    kingHelper = prevFullOrder.find(n => partnersASet.has(n)) || null;
+    // B-helpers'ı prevFullOrder sırasına göre al
+    challengerHelpers = prevFullOrder.filter(n => partnersBSet.has(n));
+  } else {
+    kingHelper = Object.keys((t.partners&&t.partners.A)||{})[0] || null;
+    challengerHelpers = Object.keys((t.partners&&t.partners.B)||{});
+  }
 
   let newKing, seatedLoser;
   if (winnerSide === "A"){
@@ -1597,18 +1620,10 @@ function advanceRotation(t, winnerSide){
     seatedLoser = king;
   }
 
-  // Yeni "tam sıra listesi": KAYBEDEN EN SONDA olmalı (seatFromRotation
-  // otomatik yardımcı seçerken kuyruğun SON elemanını seçiyor - "kaybeden
-  // oturan doğrudan yeni yardımcı olur" kuralı budur). Bu elin diğer
-  // ortakları (challengerHelpers) ÖNCE gelir - böylece sırayla rakip
-  // olma hakkını alırlar. Eski yardımcı (kingHelper) ise EN BAŞA değil,
-  // bu ortakların ARDINDAN eklenir; aksi hâlde eski yardımcı hep
-  // kaybedenle yer değiştirip aynı iki kişi arasında sonsuz döngüye
-  // girer, diğerleri (Willy/Dani gibi) hiç sıraya giremez.
   const fullOrder = [];
   fullOrder.push(...challengerHelpers);
   if (kingHelper) fullOrder.push(kingHelper);
-  fullOrder.push(seatedLoser); // EN SONDA - otomatik yardımcı seçilecek
+  fullOrder.push(seatedLoser);
 
   return { king: newKing, fullOrder };
 }
