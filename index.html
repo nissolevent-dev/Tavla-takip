@@ -1015,30 +1015,24 @@ function addSessionPlayerFromInput(){
   Object.entries(s.tables||{}).forEach(([tid, t])=>{
     if (!t.usesRotation || !t.rotation || !t.rotation.king) return;
 
-    let fullOrder = Array.isArray(t.rotation.fullOrder)
-      ? t.rotation.fullOrder.slice()
-      : Array.isArray(t.rotation.queue)
-        ? [...(t.rotation.kingHelper ? [t.rotation.kingHelper] : []), ...t.rotation.queue, t.seated && t.seated.B].filter(Boolean)
-        : [];
+    // Firebase array'leri bazen numeric-keyed object olarak döner
+    const rawFO = t.rotation.fullOrder;
+    let fullOrder = Array.isArray(rawFO)
+      ? rawFO.slice()
+      : (rawFO && typeof rawFO === 'object')
+        ? Object.keys(rawFO).sort((a,b)=>+a-+b).map(k=>rawFO[k])
+        : Array.isArray(t.rotation.queue)
+          ? [...(t.rotation.kingHelper ? [t.rotation.kingHelper] : []), ...t.rotation.queue, t.seated && t.seated.B].filter(Boolean)
+          : [];
 
-    // Mevcut oyuncu sayısını bul (kral + fullOrder içindekiler, tekrarsız)
-    const currentCount = new Set([t.rotation.king, ...fullOrder]).size;
+    if (!fullOrder.length) return;
 
-    if (currentCount === 4){
-      // 4'ten 5'e geçiş — özel kural:
-      // fullOrder = [...arakilerpB, kaybeden(en sonda)]
-      // Yeni oyuncu kaybedenden ÖNCE (yani sıranın sonuna ama yardımcıdan önce) eklenir.
-      // Böylece: [...mevcut_rakipler, yeni_kişi, kaybeden(yardımcı)]
-      const loser = fullOrder[fullOrder.length - 1]; // en sonda = kaybeden = yeni yardımcı
-      const rest = fullOrder.slice(0, -1);           // kaybeden hariç kalanlar
-      fullOrder = [...rest, name, loser];             // yeni kişi sıranın sonuna, kaybeden en sona
-    } else {
-      // Zaten 5+ kişi veya ilk el — yeni kişiyi kuyruğun sonuna ekle
-      // (kaybedenden önce, yardımcı seçimini bozmamak için)
-      const loser = fullOrder[fullOrder.length - 1];
-      const rest = fullOrder.slice(0, -1);
-      fullOrder = [...rest, name, loser];
-    }
+    // Kural: yeni kişi sıranın sonuna girer ama kaybedenden (en sondaki =
+    // bir sonraki elde Kral'ın yardımcısı olacak kişi) ÖNCE kalır.
+    // Bu kural 4->5, 5->6, 6->7 geçişlerinin hepsinde aynıdır.
+    const loser = fullOrder[fullOrder.length - 1];
+    const rest  = fullOrder.slice(0, -1);
+    fullOrder = [...rest, name, loser];
 
     fbSet(`${tablesPath()}/${tid}/rotation/fullOrder`, fullOrder);
   });
