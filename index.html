@@ -1006,28 +1006,41 @@ function addSessionPlayerFromInput(){
   if (!s) return;
   if ((s.activePlayers||{})[name]){ alert(`${name} zaten oturumda.`); return; }
 
-  // genel oyuncu listesinde yoksa oraya da ekle
   if (!Object.values(STATE.players).includes(name)){
     fbPush("players", name);
   }
   fbSet(`sessions/${sid}/activePlayers/${name}`, true);
   inp.value = "";
 
-  // Bu oyuncuyu, oturumdaki rotasyonlu masaların her birinde "sıradaki
-  // ilk rakip" olacak şekilde ekler. Mevcut elin oturanlarına (seated)
-  // dokunulmaz; sadece BİR SONRAKİ elin sırasına (rotation.fullOrder)
-  // dahil edilir - "Yeni El Başlat" tıklandığında bu listeye göre
-  // gerçek oturma düzeni kurulacaktır.
   Object.entries(s.tables||{}).forEach(([tid, t])=>{
     if (!t.usesRotation || !t.rotation || !t.rotation.king) return;
-    if (Array.isArray(t.rotation.fullOrder)){
-      const newOrder = [name].concat(t.rotation.fullOrder);
-      fbSet(`${tablesPath()}/${tid}/rotation/fullOrder`, newOrder);
-    } else if (Array.isArray(t.rotation.queue)){
-      // Eski format (ilk kurulumdan kalma, henüz hiç el bitmemiş).
-      const newQueue = [name].concat(t.rotation.queue);
-      fbSet(`${tablesPath()}/${tid}/rotation/queue`, newQueue);
+
+    let fullOrder = Array.isArray(t.rotation.fullOrder)
+      ? t.rotation.fullOrder.slice()
+      : Array.isArray(t.rotation.queue)
+        ? [...(t.rotation.kingHelper ? [t.rotation.kingHelper] : []), ...t.rotation.queue, t.seated && t.seated.B].filter(Boolean)
+        : [];
+
+    // Mevcut oyuncu sayısını bul (kral + fullOrder içindekiler, tekrarsız)
+    const currentCount = new Set([t.rotation.king, ...fullOrder]).size;
+
+    if (currentCount === 4){
+      // 4'ten 5'e geçiş — özel kural:
+      // fullOrder = [...arakilerpB, kaybeden(en sonda)]
+      // Yeni oyuncu kaybedenden ÖNCE (yani sıranın sonuna ama yardımcıdan önce) eklenir.
+      // Böylece: [...mevcut_rakipler, yeni_kişi, kaybeden(yardımcı)]
+      const loser = fullOrder[fullOrder.length - 1]; // en sonda = kaybeden = yeni yardımcı
+      const rest = fullOrder.slice(0, -1);           // kaybeden hariç kalanlar
+      fullOrder = [...rest, name, loser];             // yeni kişi sıranın sonuna, kaybeden en sona
+    } else {
+      // Zaten 5+ kişi veya ilk el — yeni kişiyi kuyruğun sonuna ekle
+      // (kaybedenden önce, yardımcı seçimini bozmamak için)
+      const loser = fullOrder[fullOrder.length - 1];
+      const rest = fullOrder.slice(0, -1);
+      fullOrder = [...rest, name, loser];
     }
+
+    fbSet(`${tablesPath()}/${tid}/rotation/fullOrder`, fullOrder);
   });
 }
 
@@ -1452,29 +1465,21 @@ function renderTablesScreen(){
 }
 
 function loadSetupPickFromTable(t){
-  // Mevcut masanın tam oyuncu sırasını yeniden kurup zar ekranına yükle.
-  // rotation.fullOrder = [B-helpers..., kingHelper?, challenger]
-  // Kral (seated.A) en büyük olduğuna göre sıra: [king, ...fullOrder] ters okununca elde edilir.
-  // Ama asıl sıra: king=1, fullOrder'ın son elemanı=2 (challenger), önündekiler sırayla.
-  // Basitçe: king en başa, sonra fullOrder'ı ters çevir (en son challenger=2.büyük olmayabilir).
-  // Daha doğrusu: king + fullOrder aynen sıra (king=1.büyük, fullOrder[son]=challenger=2.büyük gibi değil).
-  // fullOrder zaten doğru rotasyon sırasını tutuyor: sırayla rakip gelecekler.
-  // Zar ekranı için king'i en başa, geri kalanları fullOrder sırasıyla göster.
-  if (t && t.rotation && t.rotation.king){
+  // İlk zar sırası initialRanking'de saklı — her el boyunca değişmez.
+  if (t && Array.isArray(t.initialRanking) && t.initialRanking.length >= 2){
+    dicePick = { ranking: t.initialRanking.slice() };
+  } else if (t && t.rotation && t.rotation.king){
+    // Eski masalar için fallback
     const king = t.rotation.king;
     let rest = [];
     if (Array.isArray(t.rotation.fullOrder) && t.rotation.fullOrder.length > 0){
-      // fullOrder'ın son elemanı şu anki challenger (en son eklenen = en küçük başlangıçta).
-      // Zar sırası: king=en büyük, sonra fullOrder tersten gelir mi? Hayır, doğrudan kullan.
       rest = t.rotation.fullOrder.slice();
     } else if (Array.isArray(t.rotation.queue)){
       if (t.rotation.kingHelper) rest.push(t.rotation.kingHelper);
       rest.push(...t.rotation.queue);
       if (t.seated && t.seated.B) rest.push(t.seated.B);
     }
-    // Tekrarları kaldır, king'i başa koy
-    const all = [king, ...rest.filter(n=>n!==king)];
-    dicePick = { ranking: all };
+    dicePick = { ranking: [king, ...rest.filter(n=>n!==king)] };
   } else {
     dicePick = { ranking: [] };
   }
@@ -1532,27 +1537,23 @@ document.getElementById("diceResetBtn").addEventListener("click", ()=>{
 
 /* seatFromRotation: king + kuyruktaki herkesin toplamına göre KENDİSİ
    karar verir (useHelper parametresi YOK artık - dinamik). Toplam
-   oyuncu sayısı (king + queue.length + kingHelper varsa) 5 ise Kral'ın
-   yardımcısı olur, değilse (4 veya başka sayılarda) Kral hep tek kalır.
+   oyuncu sayısı (king + queue.length + kingHelper varsa) 5,6,7 ise Kral'ın
+   yardımcısı olur, 4 kişide Kral hep tek kalır.
    Bu sayede oturuma sonradan oyuncu eklenip çıkarılınca kural anında
    güncel oyuncu sayısına göre kendini ayarlar. */
 function seatFromRotation(king, kingHelperWanted, queueFull){
   const totalPlayers = 1 + (kingHelperWanted ? 1 : 0) + queueFull.length;
-  const useHelper = totalPlayers === 5;
+  const useHelper = totalPlayers >= 5; // 5,6,7 kişide Kral'ın yardımcısı var
   let kingHelper = null;
   let queue = queueFull.slice();
   if (useHelper){
-    // Kral'ın yardımcısı isteniyor ve mevcutsa onu kullan; yoksa
-    // kuyruktaki ikinci kişiyi (4. en büyük benzeri) yardımcı yap.
     if (kingHelperWanted && queueFull.includes(kingHelperWanted)){
       kingHelper = kingHelperWanted;
       queue = queueFull.filter(n=>n!==kingHelperWanted);
     } else if (kingHelperWanted){
       kingHelper = kingHelperWanted;
-      // kingHelperWanted kuyrukta değilse (örn. yeni atandı), olduğu gibi kullan
     } else if (queueFull.length >= 2){
-      // Otomatik yardımcı: kuyruktaki en büyük (sondaki) kişi - ilk
-      // kurulumda bu "4. en büyük" konumuna denk gelir.
+      // Otomatik yardımcı: kuyruğun son elemanı (kaybeden bu konuma gelir).
       kingHelper = queueFull[queueFull.length - 1];
       queue = queueFull.slice(0, -1);
     }
@@ -1564,9 +1565,6 @@ function seatFromRotation(king, kingHelperWanted, queueFull){
   const partnersB = {};
   challengerHelpers.forEach(n=> partnersB[n] = true);
 
-  // fullOrder: advanceRotation'ın sırayı doğru okuyabilmesi için
-  // challengers helpers sırasıyla, ardından kingHelper, en sonda challenger.
-  // Bu şekilde ilk elden itibaren fullOrder her zaman mevcut olur.
   const fullOrder = [...challengerHelpers];
   if (kingHelper) fullOrder.push(kingHelper);
   fullOrder.push(challenger);
@@ -1589,16 +1587,60 @@ function seatFromRotation(king, kingHelperWanted, queueFull){
    yardımcısı, kalan 2 kişi rakibin ortağı. Sonraki her elde: oyunu
    (oturarak) kaybeden, bir sonraki elde DOĞRUDAN kazananın (yeni Kral'ın)
    yardımcısı olur; eski yardımcı sıranın sonuna gider. */
+/* ranking: en büyükten en küçüğe sıralanmış isim listesi. Kral = ranking[0].
+   4 KİŞİDE: Kral HEP TEK. Sıra: en küçük → 2.büyük → 3.büyük.
+   5 KİŞİDE: A=Kral+R4, B=R5+[R2,R3]. Kaybeden oturan → yeni yardımcı.
+   6 KİŞİDE: A=Kral+R5, B=R6+[R2,R3,R4]. Kaybeden oturan → yeni yardımcı.
+   7 KİŞİDE: A=Kral+R6, B=R7+[R2,R3,R4,R5]. Kaybeden oturan → yeni yardımcı. */
 function rotationFromRanking(ranking){
+  const n = ranking.length;
   const king = ranking[0];
-  // Tüm geri kalanları: en küçük en önde, sonra 2.en büyük, 3.en büyük...
-  // (doğal sıra). seatFromRotation, toplam sayıya göre kendisi 5 kişi
-  // durumunda ikinciyi otomatik Kral yardımcısı yapar.
-  const nonKing = ranking.slice(1); // [2.en büyük, 3.en büyük, ..., en küçük]
+
+  if (n === 4){
+    // 4 kişi: Kral tek, rakip sırası en küçükten başlar
+    // queueForChallenger = [R4, R2, R3]
+    const nonKing = ranking.slice(1);
+    const lowest = nonKing[nonKing.length - 1];
+    const restInOrder = nonKing.slice(0, -1);
+    const queueForChallenger = [lowest].concat(restInOrder);
+    return seatFromRotation(king, null, queueForChallenger);
+  }
+
+  if (n === 5){
+    // 5 kişi: A=R1+R4, B=R5+[R2,R3]
+    // queueForChallenger = [R5, R2, R3, R4] → seatFromRotation son elemanı (R4) helper yapar
+    const nonKing = ranking.slice(1); // [R2,R3,R4,R5]
+    const lowest = nonKing[nonKing.length - 1]; // R5
+    const rest = nonKing.slice(0, -1); // [R2,R3,R4]
+    return seatFromRotation(king, null, [lowest, ...rest]);
+  }
+
+  if (n === 6){
+    // 6 kişi: A=R1+R5, B=R6+[R2,R3,R4]
+    // queueForChallenger = [R6, R2, R3, R4, R5] → son eleman R5 helper olur
+    const nonKing = ranking.slice(1); // [R2,R3,R4,R5,R6]
+    const lowest = nonKing[nonKing.length - 1]; // R6
+    const helper = nonKing[nonKing.length - 2]; // R5
+    const rest = nonKing.slice(0, -2); // [R2,R3,R4]
+    // queue: [R6, R2, R3, R4, R5] — son eleman (R5) otomatik helper seçilir
+    return seatFromRotation(king, null, [lowest, ...rest, helper]);
+  }
+
+  if (n === 7){
+    // 7 kişi: A=R1+R6, B=R7+[R2,R3,R4,R5]
+    // queueForChallenger = [R7, R2, R3, R4, R5, R6] → son eleman R6 helper olur
+    const nonKing = ranking.slice(1); // [R2,R3,R4,R5,R6,R7]
+    const lowest = nonKing[nonKing.length - 1]; // R7
+    const helper = nonKing[nonKing.length - 2]; // R6
+    const rest = nonKing.slice(0, -2); // [R2,R3,R4,R5]
+    return seatFromRotation(king, null, [lowest, ...rest, helper]);
+  }
+
+  // Fallback: genel mantık (en küçük önce, kalan büyükten küçüğe)
+  const nonKing = ranking.slice(1);
   const lowest = nonKing[nonKing.length - 1];
-  const restInOrder = nonKing.slice(0, -1); // [2.en büyük, 3.en büyük, ...]
-  const queueForChallenger = [lowest].concat(restInOrder);
-  return seatFromRotation(king, null, queueForChallenger);
+  const restInOrder = nonKing.slice(0, -1);
+  return seatFromRotation(king, null, [lowest, ...restInOrder]);
 }
 /* Bir el bittiğinde sıradaki eli (yeni Kral/yardımcı/rakip/ortaklar) hesaplar.
    Yardımcı kuralı artık STATİK bir bayrak değil, o anki TOPLAM oyuncu
@@ -1621,9 +1663,14 @@ function advanceRotation(t, winnerSide){
   // fullOrder = [challengerHelpers..., kingHelper?, seatedLoser(en sonda)]
   // Şimdiki el için: king=fullOrder'da yok (zaten kral), challenger da yok
   // (o ayrı), fullOrder'dan kim kim belli.
-  let prevFullOrder = Array.isArray(t.rotation && t.rotation.fullOrder)
-    ? t.rotation.fullOrder.slice()
-    : null;
+  // Firebase array'leri bazen numeric-keyed object olarak döner.
+  // Her iki durumu da handle et.
+  const rawFO = t.rotation && t.rotation.fullOrder;
+  let prevFullOrder = Array.isArray(rawFO)
+    ? rawFO.slice()
+    : (rawFO && typeof rawFO === "object")
+      ? Object.keys(rawFO).sort((a,b)=>+a-+b).map(k=>rawFO[k])
+      : null;
 
   // prevFullOrder = [...challengerHelpers, kingHelper?, seatedLoser]
   // yani son eleman = bu elin seated.B veya seated.A (kaybeden oturan)
@@ -1766,6 +1813,7 @@ function launchDiceGame(autoVidoCount){
     usesRotation: true,
     usesKingHelper: setup.usesKingHelper,
     format: fmt,
+    initialRanking: dicePick.ranking.slice(), // zar sırası sakla - "Düzenle" için
     game
   });
   goScreen("s4", currentTableId);
@@ -1807,11 +1855,20 @@ function startGameForTable(id, autoVidoCount){
     // Kral/yardımcı kuralı ona göre doğru kurulur.
     const sessionNames = new Set(getSessionPlayerNames());
     let fullOrder;
-    if (Array.isArray(t.rotation.fullOrder)){
-      fullOrder = [t.rotation.king, ...t.rotation.fullOrder.filter(n=>n!==t.rotation.king)]
+
+    // Firebase array'leri bazen numeric-keyed object olarak döner,
+    // Array.isArray false verebilir. Her iki durumu da handle et.
+    const rawFull = t.rotation.fullOrder;
+    const parsedFull = Array.isArray(rawFull)
+      ? rawFull
+      : (rawFull && typeof rawFull === "object")
+        ? Object.keys(rawFull).sort((a,b)=>+a-+b).map(k=>rawFull[k])
+        : null;
+
+    if (parsedFull && parsedFull.length > 0){
+      fullOrder = [t.rotation.king, ...parsedFull.filter(n=>n!==t.rotation.king)]
         .filter(n=>sessionNames.has(n));
     } else if (Array.isArray(t.rotation.queue)){
-      // Eski format (ilk kurulumdan kalma): king + kingHelper + queue.
       fullOrder = [t.rotation.king];
       if (t.rotation.kingHelper) fullOrder.push(t.rotation.kingHelper);
       fullOrder.push(...t.rotation.queue);
