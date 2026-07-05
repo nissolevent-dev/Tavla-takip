@@ -1936,11 +1936,25 @@ function renderGameScreen(){
     unitNote.classList.add("warn");
   }
 
-  if (t.usesRotation && t.rotation && Array.isArray(t.rotation.queue)){
-    document.getElementById("rotationNote").style.display = "block";
-    const helperTxt = t.rotation.kingHelper ? ` (yardımcısı: ${t.rotation.kingHelper})` : "";
-    document.getElementById("rotationNote").textContent =
-      `👑 ${t.rotation.king}${helperTxt} masada kalıyor. Sıradaki rakipler: ${t.rotation.queue.join(" → ") || "—"}`;
+  if (t.usesRotation && t.rotation && t.rotation.king){
+    const rawFO = t.rotation.fullOrder;
+    const fo = Array.isArray(rawFO) ? rawFO
+      : (rawFO && typeof rawFO === 'object')
+        ? Object.keys(rawFO).sort((a,b)=>+a-+b).map(k=>rawFO[k])
+        : [];
+    // fullOrder = [...B-helpers, kingHelper?, challenger]
+    // Sıradaki oyuncular = challenger (son), sonra diğerleri
+    // Gösterim: tüm fullOrder sırasıyla (challenger öne çekilerek)
+    const challenger = fo[fo.length - 1];
+    const rest = fo.slice(0, -1).filter(n => n !== challenger);
+    const nextPlayers = challenger ? [challenger, ...rest] : rest;
+    if (nextPlayers.length > 0){
+      document.getElementById("rotationNote").style.display = "block";
+      document.getElementById("rotationNote").textContent =
+        `Sıradaki oyuncular: ${nextPlayers.join(" · ")}`;
+    } else {
+      document.getElementById("rotationNote").style.display = "none";
+    }
   } else {
     document.getElementById("rotationNote").style.display = "none";
   }
