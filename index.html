@@ -350,6 +350,7 @@
     <div class="card">
       <div class="unit-note" id="unitNote"></div>
       <div class="small-note" id="rotationNote" style="text-align:center;display:none;"></div>
+      <div id="autoVidoBand" style="display:none;text-align:center;background:var(--gold-dark);color:#fff;border-radius:8px;padding:5px 12px;font-size:13px;font-weight:700;margin-bottom:6px;">🎲 Otomatik vidolu el · x2</div>
 
       <div class="side-box A" id="sideABox"></div>
       <div class="side-box B" id="sideBBox"></div>
@@ -474,25 +475,14 @@
 </div>
 
 <!-- OTOMATİK VİDO MODALI -->
-<div id="autoVidoOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;padding:20px;">
-  <div style="background:#fff;border-radius:16px;padding:22px 20px;max-width:300px;width:100%;">
-    <h2 style="margin:0 0 8px;font-size:14px;color:var(--gold-dark);text-transform:uppercase;font-weight:700;letter-spacing:.5px;">🎲 Otomatik Vido</h2>
-    <div id="autoVidoStep1">
-      <div class="small-note" style="margin-bottom:16px;">Bu elde başlangıçta otomatik vido var mı?</div>
-      <div class="row">
-        <button class="btn-soft" id="autoVidoNo">Yok — Normal Başlat</button>
-        <button class="btn-main" id="autoVidoYes" style="margin-top:0;">Var</button>
-      </div>
-    </div>
-    <div id="autoVidoStep2" style="display:none;">
-      <div class="small-note" style="margin-bottom:4px;">Kaç otomatik vido var?</div>
-      <div class="small-note" style="margin-bottom:14px;color:var(--gold-dark);font-weight:700;" id="autoVidoPreview"></div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px;" id="autoVidoKeypad"></div>
-      <div class="row" style="margin-top:14px;">
-        <button class="btn-soft" id="autoVidoBack">← Geri</button>
-        <button class="btn-main" id="autoVidoConfirm" style="margin-top:0;">Başlat</button>
-      </div>
-    </div>
+
+<!-- OTOMATİK VİDO MODALI -->
+<div id="autoVidoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:16px;padding:28px 24px;max-width:280px;width:100%;text-align:center;">
+    <div style="font-size:36px;margin-bottom:10px;">🎲</div>
+    <h2 style="margin:0 0 8px;font-size:18px;color:var(--gold-dark);font-weight:800;">Otomatik Vido</h2>
+    <div style="font-size:15px;color:#555;margin-bottom:22px;">Bu el <b style="color:var(--gold-dark);font-size:20px;">x2</b> ile başlıyor</div>
+    <button class="btn-main" id="autoVidoModalOk">Tamam</button>
   </div>
 </div>
 
@@ -521,13 +511,13 @@
 <script>
 /* ===================== FIREBASE CONFIG ===================== */
 const firebaseConfig = {
-  apiKey: "AIzaSyDr7hCb8U4G4lw4brY1EClyO3yckGoKdWc",
-  authDomain: "pisti-2f056.firebaseapp.com",
-  databaseURL: "https://pisti-2f056-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "pisti-2f056",
-  storageBucket: "pisti-2f056.firebasestorage.app",
-  messagingSenderId: "449326691735",
-  appId: "1:449326691735:web:eac90ea3eb6d45853980d2"
+  apiKey: "AIzaSyAdH8QxoGPGxQ_clLY3mAA2bptKwr5_A68",
+  authDomain: "tavla-takip.firebaseapp.com",
+  databaseURL: "https://tavla-takip-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "tavla-takip",
+  storageBucket: "tavla-takip.firebasestorage.app",
+  messagingSenderId: "481796717146",
+  appId: "1:481796717146:web:d051b2dbfe0d27a87ef663"
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
@@ -823,76 +813,15 @@ document.getElementById("pwModalConfirm").addEventListener("click", ()=>{
 });
 
 /* ===================== OTOMATİK VİDO MODALI ===================== */
-let autoVidoDigit = 0;
-let autoVidoCallback = null; // null = launchDiceGame, fn = nextHand
+/* ===================== OTOMATİK VİDO (her 3. el) =====================
+   Her 3. elde otomatik 1 vido (2x) uygulanır.
+   Eğer bir elde mars olursa veya oturan biri "Görmedi" derse,
+   bir sonraki el de otomatik vido ile başlar ve sayaç sıfırlanır.
+   Masa üzerinde saklanır: { autoVidoNextHand, handsSinceReset } */
 
-function openAutoVidoModal(onConfirm){
-  autoVidoDigit = 0;
-  autoVidoCallback = onConfirm || null;
-  document.getElementById("autoVidoStep1").style.display = "block";
-  document.getElementById("autoVidoStep2").style.display = "none";
-  document.getElementById("autoVidoOverlay").style.display = "flex";
+function shouldAutoVido(t){
+  return !!t.autoVidoNextHand;
 }
-function closeAutoVidoModal(){
-  document.getElementById("autoVidoOverlay").style.display = "none";
-}
-function renderAutoVidoPreview(){
-  const count = autoVidoDigit;
-  const multiplier = Math.pow(2, count);
-  document.getElementById("autoVidoPreview").textContent =
-    count === 0
-      ? "0 vido → normal başlar (x1)"
-      : `${count} vido → ${multiplier}x başlar`;
-}
-function buildAutoVidoKeypad(){
-  const kp = document.getElementById("autoVidoKeypad");
-  if (kp.childElementCount) return;
-  const keys = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
-  keys.forEach(k=>{
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "pw-key" + (k==="" ? " pw-key-empty" : "");
-    btn.textContent = k;
-    if (k !== ""){
-      btn.addEventListener("click", ()=>{
-        if (k === "⌫"){
-          autoVidoDigit = 0;
-        } else {
-          const n = parseInt(k);
-          if (n >= 1 && n <= 9) autoVidoDigit = n; // tek hane, 1-9 arası
-        }
-        renderAutoVidoPreview();
-      });
-    }
-    kp.appendChild(btn);
-  });
-}
-
-document.getElementById("autoVidoNo").addEventListener("click", ()=>{
-  const cb = autoVidoCallback;
-  closeAutoVidoModal();
-  if (cb) cb(0);
-  else launchDiceGame(0);
-});
-document.getElementById("autoVidoYes").addEventListener("click", ()=>{
-  autoVidoDigit = 0;
-  document.getElementById("autoVidoStep1").style.display = "none";
-  document.getElementById("autoVidoStep2").style.display = "block";
-  buildAutoVidoKeypad();
-  renderAutoVidoPreview();
-});
-document.getElementById("autoVidoBack").addEventListener("click", ()=>{
-  document.getElementById("autoVidoStep1").style.display = "block";
-  document.getElementById("autoVidoStep2").style.display = "none";
-});
-document.getElementById("autoVidoConfirm").addEventListener("click", ()=>{
-  if (autoVidoDigit < 1){ alert("En az 1 vido girin."); return; }
-  const count = autoVidoDigit;
-  const cb = autoVidoCallback;
-  closeAutoVidoModal();
-  if (cb) cb(count);
-  else launchDiceGame(count);
-});
 
 document.getElementById("addPlayerBtn").addEventListener("click", addPlayerFromInput);
 document.getElementById("newPlayerInput").addEventListener("keydown", e=>{
@@ -1015,7 +944,6 @@ function addSessionPlayerFromInput(){
   Object.entries(s.tables||{}).forEach(([tid, t])=>{
     if (!t.usesRotation || !t.rotation || !t.rotation.king) return;
 
-    // Firebase array'leri bazen numeric-keyed object olarak döner
     const rawFO = t.rotation.fullOrder;
     let fullOrder = Array.isArray(rawFO)
       ? rawFO.slice()
@@ -1027,9 +955,6 @@ function addSessionPlayerFromInput(){
 
     if (!fullOrder.length) return;
 
-    // Kural: yeni kişi sıranın sonuna girer ama kaybedenden (en sondaki =
-    // bir sonraki elde Kral'ın yardımcısı olacak kişi) ÖNCE kalır.
-    // Bu kural 4->5, 5->6, 6->7 geçişlerinin hepsinde aynıdır.
     const loser = fullOrder[fullOrder.length - 1];
     const rest  = fullOrder.slice(0, -1);
     fullOrder = [...rest, name, loser];
@@ -1459,11 +1384,9 @@ function renderTablesScreen(){
 }
 
 function loadSetupPickFromTable(t){
-  // İlk zar sırası initialRanking'de saklı — her el boyunca değişmez.
   if (t && Array.isArray(t.initialRanking) && t.initialRanking.length >= 2){
     dicePick = { ranking: t.initialRanking.slice() };
   } else if (t && t.rotation && t.rotation.king){
-    // Eski masalar için fallback
     const king = t.rotation.king;
     let rest = [];
     if (Array.isArray(t.rotation.fullOrder) && t.rotation.fullOrder.length > 0){
@@ -1541,13 +1464,17 @@ function seatFromRotation(king, kingHelperWanted, queueFull){
   let kingHelper = null;
   let queue = queueFull.slice();
   if (useHelper){
+    // Kral'ın yardımcısı isteniyor ve mevcutsa onu kullan; yoksa
+    // kuyruktaki ikinci kişiyi (4. en büyük benzeri) yardımcı yap.
     if (kingHelperWanted && queueFull.includes(kingHelperWanted)){
       kingHelper = kingHelperWanted;
       queue = queueFull.filter(n=>n!==kingHelperWanted);
     } else if (kingHelperWanted){
       kingHelper = kingHelperWanted;
+      // kingHelperWanted kuyrukta değilse (örn. yeni atandı), olduğu gibi kullan
     } else if (queueFull.length >= 2){
-      // Otomatik yardımcı: kuyruğun son elemanı (kaybeden bu konuma gelir).
+      // Otomatik yardımcı: kuyruktaki en büyük (sondaki) kişi - ilk
+      // kurulumda bu "4. en büyük" konumuna denk gelir.
       kingHelper = queueFull[queueFull.length - 1];
       queue = queueFull.slice(0, -1);
     }
@@ -1591,46 +1518,35 @@ function rotationFromRanking(ranking){
   const king = ranking[0];
 
   if (n === 4){
-    // 4 kişi: Kral tek, rakip sırası en küçükten başlar
-    // queueForChallenger = [R4, R2, R3]
     const nonKing = ranking.slice(1);
     const lowest = nonKing[nonKing.length - 1];
     const restInOrder = nonKing.slice(0, -1);
-    const queueForChallenger = [lowest].concat(restInOrder);
-    return seatFromRotation(king, null, queueForChallenger);
+    return seatFromRotation(king, null, [lowest].concat(restInOrder));
   }
 
   if (n === 5){
-    // 5 kişi: A=R1+R4, B=R5+[R2,R3]
-    // queueForChallenger = [R5, R2, R3, R4] → seatFromRotation son elemanı (R4) helper yapar
-    const nonKing = ranking.slice(1); // [R2,R3,R4,R5]
-    const lowest = nonKing[nonKing.length - 1]; // R5
-    const rest = nonKing.slice(0, -1); // [R2,R3,R4]
+    const nonKing = ranking.slice(1);
+    const lowest = nonKing[nonKing.length - 1];
+    const rest = nonKing.slice(0, -1);
     return seatFromRotation(king, null, [lowest, ...rest]);
   }
 
   if (n === 6){
-    // 6 kişi: A=R1+R5, B=R6+[R2,R3,R4]
-    // queueForChallenger = [R6, R2, R3, R4, R5] → son eleman R5 helper olur
-    const nonKing = ranking.slice(1); // [R2,R3,R4,R5,R6]
-    const lowest = nonKing[nonKing.length - 1]; // R6
-    const helper = nonKing[nonKing.length - 2]; // R5
-    const rest = nonKing.slice(0, -2); // [R2,R3,R4]
-    // queue: [R6, R2, R3, R4, R5] — son eleman (R5) otomatik helper seçilir
+    const nonKing = ranking.slice(1);
+    const lowest = nonKing[nonKing.length - 1];
+    const helper = nonKing[nonKing.length - 2];
+    const rest = nonKing.slice(0, -2);
     return seatFromRotation(king, null, [lowest, ...rest, helper]);
   }
 
   if (n === 7){
-    // 7 kişi: A=R1+R6, B=R7+[R2,R3,R4,R5]
-    // queueForChallenger = [R7, R2, R3, R4, R5, R6] → son eleman R6 helper olur
-    const nonKing = ranking.slice(1); // [R2,R3,R4,R5,R6,R7]
-    const lowest = nonKing[nonKing.length - 1]; // R7
-    const helper = nonKing[nonKing.length - 2]; // R6
-    const rest = nonKing.slice(0, -2); // [R2,R3,R4,R5]
+    const nonKing = ranking.slice(1);
+    const lowest = nonKing[nonKing.length - 1];
+    const helper = nonKing[nonKing.length - 2];
+    const rest = nonKing.slice(0, -2);
     return seatFromRotation(king, null, [lowest, ...rest, helper]);
   }
 
-  // Fallback: genel mantık (en küçük önce, kalan büyükten küçüğe)
   const nonKing = ranking.slice(1);
   const lowest = nonKing[nonKing.length - 1];
   const restInOrder = nonKing.slice(0, -1);
@@ -1654,11 +1570,6 @@ function advanceRotation(t, winnerSide){
   // Ortakların SIRASI kritik — Object.keys(partners.B) Firebase'den
   // gelirken sıra garantisi yok, bu yüzden önceki rotation.fullOrder'dan
   // türetiyoruz: orada sıra kayıtlı ve korunuyor.
-  // fullOrder = [challengerHelpers..., kingHelper?, seatedLoser(en sonda)]
-  // Şimdiki el için: king=fullOrder'da yok (zaten kral), challenger da yok
-  // (o ayrı), fullOrder'dan kim kim belli.
-  // Firebase array'leri bazen numeric-keyed object olarak döner.
-  // Her iki durumu da handle et.
   const rawFO = t.rotation && t.rotation.fullOrder;
   let prevFullOrder = Array.isArray(rawFO)
     ? rawFO.slice()
@@ -1666,19 +1577,11 @@ function advanceRotation(t, winnerSide){
       ? Object.keys(rawFO).sort((a,b)=>+a-+b).map(k=>rawFO[k])
       : null;
 
-  // prevFullOrder = [...challengerHelpers, kingHelper?, seatedLoser]
-  // yani son eleman = bu elin seated.B veya seated.A (kaybeden oturan)
-  // Bu listeden sırayı kullanıyoruz. Eğer yoksa (ilk el veya eski format),
-  // partners'tan okuyoruz.
   let kingHelper, challengerHelpers;
   if (prevFullOrder){
-    // prevFullOrder'ın son elemanı bu elin kaybeden oturanıydı (ya da kral tarafı)
-    // Ama biz şu elin partners'ını biliyoruz: prevFullOrder'dan bu elin
-    // partners.A ve partners.B'yi çıkar
     const partnersASet = new Set(Object.keys((t.partners&&t.partners.A)||{}));
     const partnersBSet = new Set(Object.keys((t.partners&&t.partners.B)||{}));
     kingHelper = prevFullOrder.find(n => partnersASet.has(n)) || null;
-    // B-helpers'ı prevFullOrder sırasına göre al
     challengerHelpers = prevFullOrder.filter(n => partnersBSet.has(n));
   } else {
     kingHelper = Object.keys((t.partners&&t.partners.A)||{})[0] || null;
@@ -1807,7 +1710,9 @@ function launchDiceGame(autoVidoCount){
     usesRotation: true,
     usesKingHelper: setup.usesKingHelper,
     format: fmt,
-    initialRanking: dicePick.ranking.slice(), // zar sırası sakla - "Düzenle" için
+    initialRanking: dicePick.ranking.slice(),
+    autoVidoNextHand: false,
+    handsSinceReset: 1,
     game
   });
   goScreen("s4", currentTableId);
@@ -1821,11 +1726,11 @@ document.getElementById("startDiceGameBtn").addEventListener("click", ()=>{
   if (dicePick.ranking.length === 4){
     openFormatModal((fmt)=>{
       pendingFormat = fmt;
-      openAutoVidoModal();
+      launchDiceGame(0);
     });
   } else {
     pendingFormat = "1v3";
-    openAutoVidoModal();
+    launchDiceGame(0);
   }
 });
 
@@ -1850,8 +1755,6 @@ function startGameForTable(id, autoVidoCount){
     const sessionNames = new Set(getSessionPlayerNames());
     let fullOrder;
 
-    // Firebase array'leri bazen numeric-keyed object olarak döner,
-    // Array.isArray false verebilir. Her iki durumu da handle et.
     const rawFull = t.rotation.fullOrder;
     const parsedFull = Array.isArray(rawFull)
       ? rawFull
@@ -1904,12 +1807,14 @@ function startGameForTable(id, autoVidoCount){
   }
 
   const game = buildInitialGame(seated, partners);
-  if (autoVidoCount > 0){
+  const isAutoVidoHand = autoVidoCount > 0;
+  if (isAutoVidoHand){
     Object.values(game.pairs).forEach(oppMap=>{
       Object.values(oppMap).forEach(p=>{ p.count = autoVidoCount; });
     });
   }
-  fbSet(`${tablesPath()}/${id}/game`, game);
+  const newHandsSinceReset = isAutoVidoHand ? 0 : (t.handsSinceReset !== undefined ? t.handsSinceReset : 1);
+  fbUpdate(`${tablesPath()}/${id}`, { game, autoVidoNextHand: false, handsSinceReset: newHandsSinceReset });
   goScreen("s4", id);
 }
 
@@ -1942,9 +1847,6 @@ function renderGameScreen(){
       : (rawFO && typeof rawFO === 'object')
         ? Object.keys(rawFO).sort((a,b)=>+a-+b).map(k=>rawFO[k])
         : [];
-    // fullOrder = [...B-helpers, kingHelper?, challenger]
-    // Sıradaki oyuncular = challenger (son), sonra diğerleri
-    // Gösterim: tüm fullOrder sırasıyla (challenger öne çekilerek)
     const challenger = fo[fo.length - 1];
     const rest = fo.slice(0, -1).filter(n => n !== challenger);
     const nextPlayers = challenger ? [challenger, ...rest] : rest;
@@ -1966,7 +1868,10 @@ function renderGameScreen(){
   document.getElementById("liveControls").style.display = finished ? "none" : "block";
   document.getElementById("finishedPanel").style.display = finished ? "block" : "none";
 
-  // Kazanma butonlarına oturanların adını yaz
+  // Otomatik vido bandı: el canlıyken ve pairs'te count>0 ise göster
+  const isAutoVidoEl = !finished && t.handsSinceReset === 0;
+  document.getElementById("autoVidoBand").style.display = isAutoVidoEl ? "block" : "none";
+
   if (!finished && t.seated){
     const nameA = t.seated.A || "A";
     const nameB = t.seated.B || "B";
@@ -2247,24 +2152,51 @@ function finishHand(tableId, winnerSide, g, isMars){
     gameNo, winner: winnerSide, mars: !!isMars, results, time: Date.now()
   });
 
+  // Otomatik vido tetikleyici: mars veya oturan biri "Görmedi" demiş mi?
+  const seatedNames = new Set([t.seated.A, t.seated.B]);
+  let seatedPlayerGormedí = false;
+  Object.entries(g.pairs||{}).forEach(([aName, oppMap])=>{
+    Object.entries(oppMap||{}).forEach(([bName, p])=>{
+      if (p.closed && seatedNames.has(p.closedLoser)){
+        seatedPlayerGormedí = true;
+      }
+    });
+  });
+  // Sayaç mantığı: her el bittikçe +1. 3'e ulaşınca → bir sonraki el otomatik vido,
+  // sayaç sıfırlanır. Mars/Görmedi de bağımsız olarak bir sonraki eli tetikler
+  // ve sayaç sıfırlanır.
+  const prevCount = t.handsSinceReset !== undefined ? t.handsSinceReset : 0;
+  // Bu el otomatik vidolu muydu?
+  // startGameForTable otomatik vido elinde handsSinceReset=0 yazar,
+  // normal elde değiştirmez. Bu en güvenilir işaret.
+  const wasAutoVidoEl = (t.handsSinceReset === 0);
+  const marsOrGormedi = wasAutoVidoEl && !!(isMars || seatedPlayerGormedí);
+  let handsSinceReset, autoVidoNextHand;
+  if (marsOrGormedi){
+    autoVidoNextHand = true;
+    handsSinceReset = 0; // sıfırdan yeniden say
+  } else if (prevCount + 1 >= 3){
+    autoVidoNextHand = true; // 3. el tamamlandı, sonraki otomatik vido
+    handsSinceReset = 0;
+  } else {
+    autoVidoNextHand = false;
+    handsSinceReset = prevCount + 1;
+  }
+
   let newRotation = null;
   if (t.usesRotation){
-    // ÖNEMLİ: artık seated/partners burada DEĞİŞTİRİLMEZ. El bittiğinde
-    // masa "bitmiş" hâliyle (eski seated/partners ile) ekranda kalır;
-    // gerçek bir sonraki oturma düzeni sadece "Yeni El Başlat"a
-    // basıldığında (startGameForTable içinde) GÜNCEL oyuncu sayısına
-    // göre kurulur. Burada sadece "sıradaki tam liste" rotation alanına
-    // kaydedilir.
     const next = t.format === "2v2"
       ? advanceRotation_2v2(t, winnerSide)
       : advanceRotation(t, winnerSide);
     newRotation = next;
     fbUpdate(`${tablesPath()}/${tableId}`, {
       game: g,
+      autoVidoNextHand,
+      handsSinceReset,
       rotation: { king: next.king, fullOrder: next.fullOrder, format: t.format || "1v3" }
     });
   } else {
-    fbSet(`${tablesPath()}/${tableId}/game`, g);
+    fbUpdate(`${tablesPath()}/${tableId}`, { game: g, autoVidoNextHand, handsSinceReset });
   }
   return newRotation;
 }
@@ -2285,14 +2217,23 @@ function renderFinishedResults(t){
 }
 
 document.getElementById("nextHandBtn").addEventListener("click", ()=>{
-  openAutoVidoModal((count)=> {
-    try{
-      startGameForTable(currentTableId, count);
-    } catch(e){
-      console.error(e);
-      alert("Yeni el başlatılırken bir hata oluştu: " + e.message);
+  try{
+    const t = STATE.tables[currentTableId];
+    const autoVidoCount = (t && shouldAutoVido(t)) ? 1 : 0;
+    if (autoVidoCount > 0){
+      document.getElementById("autoVidoModal").style.display = "flex";
+      document.getElementById("autoVidoModalOk").onclick = ()=>{
+        document.getElementById("autoVidoModal").style.display = "none";
+        try{ startGameForTable(currentTableId, autoVidoCount); }
+        catch(e){ console.error(e); alert("Yeni el başlatılırken bir hata oluştu: " + e.message); }
+      };
+    } else {
+      startGameForTable(currentTableId, 0);
     }
-  });
+  } catch(e){
+    console.error(e);
+    alert("Yeni el başlatılırken bir hata oluştu: " + e.message);
+  }
 });
 
 /* ===================== SCREEN 6: TOTALS ===================== */
