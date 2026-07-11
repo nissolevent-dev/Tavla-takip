@@ -2271,8 +2271,9 @@ document.getElementById("undoHandBtn").addEventListener("click", ()=>{
   if (snap.historyKey){
     fbRemove(`sessions/${sid}/tables/${currentTableId}/history/${snap.historyKey}`);
   }
+  // game'i fbSet ile yaz (fbUpdate merge yapar, finished:true kalabilir)
+  fbSet(`${tablesPath()}/${currentTableId}/game`, snap.game);
   fbUpdate(`${tablesPath()}/${currentTableId}`, {
-    game: snap.game,
     seated: snap.seated || t.seated,
     partners: snap.partners || t.partners,
     rotation: snap.rotation || t.rotation,
