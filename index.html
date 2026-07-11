@@ -1817,16 +1817,7 @@ function startGameForTable(id, autoVidoCount){
     });
   }
   const newHandsSinceReset = isAutoVidoHand ? 0 : (t.handsSinceReset !== undefined ? t.handsSinceReset : 1);
-  // Geri alma için: el başlamadan önceki durumu sakla
-  const previousSnapshot = {
-    game: t.game ? JSON.parse(JSON.stringify(t.game)) : null,
-    seated: t.seated ? JSON.parse(JSON.stringify(t.seated)) : null,
-    partners: t.partners ? JSON.parse(JSON.stringify(t.partners)) : null,
-    rotation: t.rotation ? JSON.parse(JSON.stringify(t.rotation)) : null,
-    handsSinceReset: t.handsSinceReset !== undefined ? t.handsSinceReset : 1,
-    autoVidoNextHand: !!t.autoVidoNextHand,
-  };
-  fbUpdate(`${tablesPath()}/${id}`, { game, autoVidoNextHand: false, handsSinceReset: newHandsSinceReset, previousSnapshot });
+  fbUpdate(`${tablesPath()}/${id}`, { game, autoVidoNextHand: false, handsSinceReset: newHandsSinceReset });
   goScreen("s4", id);
 }
 
