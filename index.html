@@ -2168,7 +2168,7 @@ function finishHand(tableId, winnerSide, g, isMars){
   });
 
   const previousSnapshot = {
-    game: gameBeforeFinish,
+    gameJson: JSON.stringify(gameBeforeFinish), // string olarak sakla - Firebase nested sorununu önler
     seated: t.seated ? JSON.parse(JSON.stringify(t.seated)) : null,
     partners: t.partners ? JSON.parse(JSON.stringify(t.partners)) : null,
     rotation: t.rotation ? JSON.parse(JSON.stringify(t.rotation)) : null,
@@ -2272,7 +2272,8 @@ document.getElementById("undoHandBtn").addEventListener("click", ()=>{
     fbRemove(`sessions/${sid}/tables/${currentTableId}/history/${snap.historyKey}`);
   }
   // game'i fbSet ile yaz (fbUpdate merge yapar, finished:true kalabilir)
-  fbSet(`${tablesPath()}/${currentTableId}/game`, snap.game);
+  const gameToRestore = snap.gameJson ? JSON.parse(snap.gameJson) : snap.game;
+  fbSet(`${tablesPath()}/${currentTableId}/game`, gameToRestore);
   fbUpdate(`${tablesPath()}/${currentTableId}`, {
     seated: snap.seated || t.seated,
     partners: snap.partners || t.partners,
