@@ -2154,15 +2154,28 @@ function finishHand(tableId, winnerSide, g, isMars){
     addSettle(loser, winner, amount);
   });
 
+  // Geri alma için: el bitmeden önceki game durumunu sakla
+  const gameBeforeFinish = JSON.parse(JSON.stringify(g));
+
   g.finished = true;
   g.winner = winnerSide;
   g.mars = !!isMars;
   g.results = results;
 
   const gameNo = Object.keys(t.history||{}).length + 1;
-  fbPush(`${tablesPath()}/${tableId}/history`, {
+  const historyRef = fbPush(`${tablesPath()}/${tableId}/history`, {
     gameNo, winner: winnerSide, mars: !!isMars, results, time: Date.now()
   });
+
+  const previousSnapshot = {
+    game: gameBeforeFinish,
+    seated: t.seated ? JSON.parse(JSON.stringify(t.seated)) : null,
+    partners: t.partners ? JSON.parse(JSON.stringify(t.partners)) : null,
+    rotation: t.rotation ? JSON.parse(JSON.stringify(t.rotation)) : null,
+    handsSinceReset: t.handsSinceReset,
+    autoVidoNextHand: !!t.autoVidoNextHand,
+    historyKey: historyRef ? historyRef.key : null,
+  };
 
   // Otomatik vido tetikleyici: mars veya oturan biri "Görmedi" demiş mi?
   const seatedNames = new Set([t.seated.A, t.seated.B]);
@@ -2203,12 +2216,13 @@ function finishHand(tableId, winnerSide, g, isMars){
     newRotation = next;
     fbUpdate(`${tablesPath()}/${tableId}`, {
       game: g,
+      previousSnapshot,
       autoVidoNextHand,
       handsSinceReset,
       rotation: { king: next.king, fullOrder: next.fullOrder, format: t.format || "1v3" }
     });
   } else {
-    fbUpdate(`${tablesPath()}/${tableId}`, { game: g, autoVidoNextHand, handsSinceReset });
+    fbUpdate(`${tablesPath()}/${tableId}`, { game: g, previousSnapshot, autoVidoNextHand, handsSinceReset });
   }
   return newRotation;
 }
@@ -2251,13 +2265,17 @@ document.getElementById("nextHandBtn").addEventListener("click", ()=>{
 document.getElementById("undoHandBtn").addEventListener("click", ()=>{
   const t = STATE.tables[currentTableId];
   if (!t || !t.previousSnapshot) { alert("Geri alınacak bir el yok."); return; }
-  if (!confirm("Bu el iptal edilip bir önceki elin bitmemiş haline dönülsün mü?")) return;
+  if (!confirm("Bu el iptal edilip bir önceki elin bitirilmemiş haline dönülsün mü?")) return;
   const snap = t.previousSnapshot;
+  const sid = STATE.activeSessionId;
+  if (snap.historyKey){
+    fbRemove(`sessions/${sid}/tables/${currentTableId}/history/${snap.historyKey}`);
+  }
   fbUpdate(`${tablesPath()}/${currentTableId}`, {
     game: snap.game,
-    seated: snap.seated,
-    partners: snap.partners,
-    rotation: snap.rotation,
+    seated: snap.seated || t.seated,
+    partners: snap.partners || t.partners,
+    rotation: snap.rotation || t.rotation,
     handsSinceReset: snap.handsSinceReset !== undefined ? snap.handsSinceReset : 1,
     autoVidoNextHand: !!snap.autoVidoNextHand,
     previousSnapshot: null,
