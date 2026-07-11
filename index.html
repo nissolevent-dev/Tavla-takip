@@ -356,6 +356,9 @@
       <div class="side-box B" id="sideBBox"></div>
 
       <div id="liveControls">
+        <div style="text-align:right;margin-bottom:4px;">
+          <button class="btn-soft btn-sm" id="undoHandBtn" style="font-size:12px;padding:4px 10px;">↩ Bu eli geri al</button>
+        </div>
         <button class="btn-main" id="vidoCalledBtn">🎲 Vido Çekildi</button>
         <div class="row" style="margin-top:16px;">
           <button class="btn-main" id="aWinsBtn">A Kazandı</button>
@@ -1814,7 +1817,16 @@ function startGameForTable(id, autoVidoCount){
     });
   }
   const newHandsSinceReset = isAutoVidoHand ? 0 : (t.handsSinceReset !== undefined ? t.handsSinceReset : 1);
-  fbUpdate(`${tablesPath()}/${id}`, { game, autoVidoNextHand: false, handsSinceReset: newHandsSinceReset });
+  // Geri alma için: el başlamadan önceki durumu sakla
+  const previousSnapshot = {
+    game: t.game ? JSON.parse(JSON.stringify(t.game)) : null,
+    seated: t.seated ? JSON.parse(JSON.stringify(t.seated)) : null,
+    partners: t.partners ? JSON.parse(JSON.stringify(t.partners)) : null,
+    rotation: t.rotation ? JSON.parse(JSON.stringify(t.rotation)) : null,
+    handsSinceReset: t.handsSinceReset !== undefined ? t.handsSinceReset : 1,
+    autoVidoNextHand: !!t.autoVidoNextHand,
+  };
+  fbUpdate(`${tablesPath()}/${id}`, { game, autoVidoNextHand: false, handsSinceReset: newHandsSinceReset, previousSnapshot });
   goScreen("s4", id);
 }
 
@@ -2234,6 +2246,22 @@ document.getElementById("nextHandBtn").addEventListener("click", ()=>{
     console.error(e);
     alert("Yeni el başlatılırken bir hata oluştu: " + e.message);
   }
+});
+
+document.getElementById("undoHandBtn").addEventListener("click", ()=>{
+  const t = STATE.tables[currentTableId];
+  if (!t || !t.previousSnapshot) { alert("Geri alınacak bir el yok."); return; }
+  if (!confirm("Bu el iptal edilip bir önceki elin bitmemiş haline dönülsün mü?")) return;
+  const snap = t.previousSnapshot;
+  fbUpdate(`${tablesPath()}/${currentTableId}`, {
+    game: snap.game,
+    seated: snap.seated,
+    partners: snap.partners,
+    rotation: snap.rotation,
+    handsSinceReset: snap.handsSinceReset !== undefined ? snap.handsSinceReset : 1,
+    autoVidoNextHand: !!snap.autoVidoNextHand,
+    previousSnapshot: null,
+  });
 });
 
 /* ===================== SCREEN 6: TOTALS ===================== */
