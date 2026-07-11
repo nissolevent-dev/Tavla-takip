@@ -1022,15 +1022,15 @@ function removeSessionPlayer(name){
       if (!t.usesRotation || !t.rotation) return;
       const next = rebuildRotationWithoutName(t, name);
       if (next){
-        const rawFull = next.rotation.fullOrder;
-        const fullOrder = Array.isArray(rawFull) ? rawFull
-          : (rawFull && typeof rawFull === "object")
-            ? Object.keys(rawFull).sort((a,b)=>+a-+b).map(k=>rawFull[k])
-            : [];
+        const kH = Object.keys(next.partners.A)[0] || null;
+        const bHelpers = Object.keys(next.partners.B);
+        const challenger = next.seated.B;
+        const correctFullOrder = [challenger, ...bHelpers];
+        if (kH) correctFullOrder.push(kH);
         fbUpdate(`${tablesPath()}/${tid}`, {
           seated: next.seated,
           partners: next.partners,
-          rotation: { king: next.rotation.king, fullOrder }
+          rotation: { king: next.rotation.king, fullOrder: correctFullOrder }
         });
       }
     });
