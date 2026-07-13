@@ -2156,7 +2156,11 @@ function finishHand(tableId, winnerSide, g, isMars){
 
   const gameNo = Object.keys(t.history||{}).length + 1;
   const historyRef = fbPush(`${tablesPath()}/${tableId}/history`, {
-    gameNo, winner: winnerSide, mars: !!isMars, autoVido: (t.handsSinceReset === 0), results, time: Date.now()
+    gameNo, winner: winnerSide, mars: !!isMars, autoVido: (t.handsSinceReset === 0),
+    winnerSeated: winnerSide === "A" ? t.seated.A : t.seated.B,
+    sideA: Object.keys({[t.seated.A]:true, ...(t.partners.A||{})}),
+    sideB: Object.keys({[t.seated.B]:true, ...(t.partners.B||{})}),
+    results, time: Date.now()
   });
 
   const previousSnapshot = {
@@ -2398,26 +2402,22 @@ function renderTotalsScreen(){
   } else {
     rows.forEach(h=>{
       const results = h.results || {};
-      // Kazananlar (pozitif) ve kaybedenler (negatif) ayrı listele, takım sırası korunuyor
-      const winners = [], losers = [];
+      const winningSide = new Set(Array.isArray(h.sideA) ? (h.winner==="A" ? h.sideA : h.sideB) : []);
+      const winnerName = h.winnerSeated || h.winner;
+      const winEntries = [], loseEntries = [];
       Object.entries(results).forEach(([n,r])=>{
         const val = (r && typeof r === "object") ? (r.total||0) : (r||0);
-        if (val >= 0) winners.push({n, val});
-        else losers.push({n, val});
+        const isWinner = winningSide.size > 0 ? winningSide.has(n) : val >= 0;
+        const str = `<span style="color:${isWinner?'var(--green-dark,#2a7a4b)':'#c0392b'};">${escapeHtml(n)} ${val>=0?'+':''}${val.toFixed(0)}</span>`;
+        if (isWinner) winEntries.push(str); else loseEntries.push(str);
       });
-      // Kazanan isimlerini başlıkta göster
-      const winnerNames = winners.map(w=>escapeHtml(w.n)).join(' + ');
-      // Sonuç satırı: önce kazananlar, sonra kaybedenler
-      const resStr = [
-        ...winners.map(({n,val})=>`<span style="color:var(--green-dark,#2a7a4b);font-weight:600;">${escapeHtml(n)} +${val.toFixed(0)}</span>`),
-        ...losers.map(({n,val})=>`<span style="color:#c0392b;">${escapeHtml(n)} ${val.toFixed(0)}</span>`)
-      ].join(' · ');
+      const resStr = [...winEntries, ...loseEntries].join(' · ');
       const div = document.createElement("div");
       div.className = "history-item";
       div.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
           <div>
-            <b>${escapeHtml(h.tname)}</b> · El ${h.gameNo} · <b>${winnerNames}</b> kazandı${h.mars ? ' <span style="color:var(--gold-dark);font-weight:800;">⭐ MARS</span>' : ''}${h.autoVido ? ' <span style="color:var(--gold-dark);">🎲 x2</span>' : ''}
+            <b>${escapeHtml(h.tname)}</b> · El ${h.gameNo} · <b>${escapeHtml(winnerName)}</b> kazandı${h.mars ? ' <span style="color:var(--gold-dark);font-weight:800;">⭐ MARS</span>' : ''}${h.autoVido ? ' <span style="color:var(--gold-dark);">🎲 x2</span>' : ''}
             <br><span class="small-note">${resStr}</span>
           </div>
           <button class="btn-danger btn-sm" style="flex:0 0 auto;">Sil</button>
