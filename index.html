@@ -2457,12 +2457,23 @@ function renderPaymentInTotals(){
   const sid = STATE.activeSessionId;
   const s = STATE.sessions[sid];
   if (!s) return;
-  const names = Object.keys(s.activePlayers||{});
-  const optHtml = names.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+  const totals = computeSessionHandTotals(s);
+  const remaining = applyPaymentsToTotals(Object.assign({}, totals), pendingPayments);
+
+  // Eksi bakiyeli = ödeyecek, artı bakiyeli = alacak
+  const debtors  = Object.entries(remaining).filter(([,v])=>v<0).map(([n])=>n);
+  const creditors = Object.entries(remaining).filter(([,v])=>v>0).map(([n])=>n);
+  const allNames  = Object.keys(s.activePlayers||{});
+
   const fromSel = document.getElementById("paymentFromSelect2");
-  const toSel = document.getElementById("paymentToSelect2");
-  if (fromSel.innerHTML !== optHtml) fromSel.innerHTML = optHtml;
-  if (toSel.innerHTML !== optHtml) toSel.innerHTML = optHtml;
+  const toSel   = document.getElementById("paymentToSelect2");
+  // Ödeyen: eksi olanlar (yoksa herkesi göster)
+  const fromNames = debtors.length ? debtors : allNames;
+  const toNames   = creditors.length ? creditors : allNames;
+  const fromHtml = fromNames.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+  const toHtml   = toNames.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+  if (fromSel.innerHTML !== fromHtml) fromSel.innerHTML = fromHtml;
+  if (toSel.innerHTML !== toHtml)     toSel.innerHTML = toHtml;
 
   const listWrap = document.getElementById("paymentListWrap2");
   listWrap.innerHTML = pendingPayments.length ? pendingPayments.map((p,i)=>`
@@ -2481,8 +2492,6 @@ function renderPaymentInTotals(){
     });
   });
 
-  const totals = computeSessionHandTotals(s);
-  const remaining = applyPaymentsToTotals(Object.assign({}, totals), pendingPayments);
   renderBalanceList(document.getElementById("remainingBalancePreview2"), remaining);
 }
 
