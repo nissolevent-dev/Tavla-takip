@@ -1,0 +1,2548 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tavla">
+<link rel="apple-touch-icon" sizes="180x180" href="icon.png">
+<link rel="icon" type="image/png" sizes="180x180" href="icon.png">
+<title>TAVLA - ORTAKLI TAKİP</title>
+<style>
+  :root{
+    --bg:#0b3d2e;
+    --bg2:#0f4d3a;
+    --card:#ffffff;
+    --card-soft:#f4f1ea;
+    --gold:#d4a44c;
+    --gold-dark:#b8862f;
+    --ink:#1c2b24;
+    --muted:#6b7a72;
+    --red:#c0392b;
+    --green:#1e8449;
+    --line:#e3ddd0;
+    --sideA:#1f6f8b;
+    --sideB:#a3492f;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink);}
+  body{
+    background:radial-gradient(circle at 50% 0%, var(--bg2), var(--bg) 70%);
+    min-height:100vh;
+    padding-bottom:calc(40px + env(safe-area-inset-bottom));
+  }
+  header{
+    text-align:center;
+    padding:18px 12px 14px;
+    padding-top:max(18px, env(safe-area-inset-top));
+    color:#fff;
+  }
+  header h1{
+    margin:0;
+    font-size:26px;
+    letter-spacing:2px;
+    color:var(--gold);
+    font-weight:800;
+    text-shadow:0 2px 4px rgba(0,0,0,.3);
+  }
+  header small{
+    display:block;
+    margin-top:2px;
+    color:#cfe8da;
+    letter-spacing:3px;
+    font-size:11px;
+  }
+  .wrap{max-width:520px;margin:0 auto;padding:0 14px;}
+  .screen{display:none;}
+  .screen.active{display:block;animation:fade .15s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+
+  .card{
+    background:var(--card);
+    border-radius:16px;
+    padding:16px;
+    margin-bottom:14px;
+    box-shadow:0 4px 14px rgba(0,0,0,.18);
+  }
+  .card h2{
+    margin:0 0 10px;
+    font-size:15px;
+    color:var(--gold-dark);
+    letter-spacing:.5px;
+    text-transform:uppercase;
+    font-weight:700;
+  }
+  label{font-size:12px;color:var(--muted);font-weight:600;display:block;margin:8px 0 4px;}
+  input[type=text],input[type=number]{
+    width:100%;
+    padding:11px 12px;
+    border-radius:10px;
+    border:1.5px solid var(--line);
+    font-size:16px;
+    background:var(--card-soft);
+    color:var(--ink);
+  }
+  input:focus{outline:none;border-color:var(--gold);}
+  select{
+    width:100%;padding:11px 12px;border-radius:10px;border:1.5px solid var(--line);
+    font-size:15px;background:var(--card-soft);color:var(--ink);
+  }
+  .row{display:flex;gap:8px;}
+  .row > *{flex:1;}
+  button{
+    border:none;
+    border-radius:12px;
+    padding:12px 14px;
+    font-size:15px;
+    font-weight:700;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  button:disabled{opacity:.4;cursor:not-allowed;}
+  .btn-main{background:var(--gold);color:#2a1d05;width:100%;margin-top:10px;}
+  .btn-main:active{background:var(--gold-dark);}
+  .btn-soft{background:var(--card-soft);color:var(--ink);border:1.5px solid var(--line);}
+  .btn-danger{background:#fbe3e0;color:var(--red);}
+  .btn-ghost{background:transparent;color:var(--gold);text-decoration:underline;padding:6px;}
+  .btn-block{width:100%;margin-top:8px;}
+  .btn-sm{padding:7px 10px;font-size:13px;border-radius:9px;}
+  .mode-active{background:var(--gold) !important;color:#2a1d05 !important;border-color:var(--gold) !important;}
+
+  .chip-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;}
+  .chip{
+    background:var(--card-soft);
+    border:1.5px solid var(--line);
+    border-radius:20px;
+    padding:8px 13px;
+    font-size:14px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .chip button{background:none;border:none;color:var(--red);font-size:15px;padding:0;font-weight:900;}
+
+  .player-pick{
+    display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;
+  }
+  .pick{
+    padding:9px 13px;border-radius:20px;border:1.5px solid var(--line);
+    background:var(--card-soft);font-size:14px;font-weight:600;color:var(--ink);
+  }
+  .pick.sel-a{background:var(--sideA);color:#fff;border-color:var(--sideA);}
+  .pick.sel-b{background:var(--sideB);color:#fff;border-color:var(--sideB);}
+  .pick.sel-on{background:var(--gold);color:#2a1d05;border-color:var(--gold);}
+  .pick.disabled{opacity:.35;}
+
+  .table-card{
+    background:var(--card);
+    border-radius:16px;
+    padding:14px;
+    margin-bottom:12px;
+    box-shadow:0 4px 14px rgba(0,0,0,.18);
+  }
+  .table-card .t-head{display:flex;justify-content:space-between;align-items:center;}
+  .table-card .t-head .tname{font-weight:800;font-size:16px;}
+  .t-sub{font-size:13px;color:var(--muted);margin-top:4px;}
+  .badge{
+    display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:10px;
+    background:var(--card-soft);color:var(--muted);margin-left:6px;
+  }
+  .badge.live{background:#e3f3e8;color:var(--green);}
+
+  .unit-note{text-align:center;font-size:12px;color:var(--muted);margin-bottom:14px;}
+  .unit-note.warn{color:var(--red);font-weight:700;}
+
+  .side-box{
+    border-radius:14px;
+    padding:12px;
+    margin-bottom:10px;
+  }
+  .side-box.A{background:rgba(31,111,139,.08);border:1.5px solid rgba(31,111,139,.35);}
+  .side-box.B{background:rgba(163,73,47,.08);border:1.5px solid rgba(163,73,47,.35);}
+  .side-box .s-title{font-weight:800;font-size:13px;letter-spacing:1px;margin-bottom:8px;text-transform:uppercase;}
+  .side-box.A .s-title{color:var(--sideA);}
+  .side-box.B .s-title{color:var(--sideB);}
+  .person-block{padding:6px 0;border-top:1px solid rgba(0,0,0,.06);}
+  .person-block:first-of-type{border-top:none;}
+  .p-row{display:flex;justify-content:space-between;align-items:center;font-size:14px;}
+  .p-row .pname{font-weight:700;}
+  .p-row .ptag{font-size:10px;color:var(--muted);font-weight:600;}
+  .p-row .ptag-seated{font-size:11px;color:var(--red);font-weight:800;letter-spacing:.5px;}
+  .opp-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0 3px 12px;font-size:12.5px;}
+  .opp-row .opp-name{color:var(--muted);}
+  .status-pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px;white-space:nowrap;}
+  .status-pill.active{background:#e3f3e8;color:var(--green);}
+  .status-pill.locked{background:#fbe3e0;color:var(--red);}
+
+  .vido-resp-row{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:10px 0;border-top:1px solid var(--line);
+  }
+  .vido-resp-row:first-child{border-top:none;}
+  .toggle-group{display:flex;gap:6px;}
+  .toggle-btn{
+    padding:8px 12px;border-radius:9px;border:1.5px solid var(--line);
+    background:var(--card-soft);font-size:13px;font-weight:700;color:var(--muted);
+  }
+  .toggle-btn.gor.on{background:#e3f3e8;border-color:var(--green);color:var(--green);}
+  .toggle-btn.yok.on{background:#fbe3e0;border-color:var(--red);color:var(--red);}
+
+  .seer-row{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:11px 13px;border-radius:11px;margin-bottom:8px;
+    border:1.5px solid var(--line);background:var(--card-soft);
+    cursor:pointer;
+  }
+  .seer-row.seen{background:#e3f3e8;border-color:var(--green);}
+  .seer-row.not-seen{background:#fbe3e0;border-color:var(--red);}
+  .seer-row .seer-name{font-weight:700;font-size:14px;}
+  .seer-row .seer-breakdown{font-size:11px;color:var(--muted);margin-top:2px;}
+  .seer-row.seen .seer-breakdown{color:#2c6e49;}
+  .seer-row.not-seen .seer-breakdown{color:#8a3226;}
+  .seer-row .seer-status{font-size:12px;font-weight:800;white-space:nowrap;}
+  .seer-row.seen .seer-status{color:var(--green);}
+  .seer-row.not-seen .seer-status{color:var(--red);}
+
+  .result-line{display:flex;justify-content:space-between;align-items:flex-start;font-size:14px;padding:7px 0;border-top:1px solid var(--line);gap:8px;}
+  .result-line:first-child{border-top:none;}
+  .result-line .amt.pos{color:var(--green);font-weight:800;white-space:nowrap;}
+  .result-line .amt.neg{color:var(--red);font-weight:800;white-space:nowrap;}
+  .vs-breakdown{font-size:11px;color:var(--muted);margin-top:2px;}
+
+  .tabbar{
+    position:fixed;bottom:0;left:0;right:0;
+    background:#fff;
+    display:flex;
+    box-shadow:0 -4px 14px rgba(0,0,0,.18);
+    z-index:50;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .tabbar button{
+    flex:1;border-radius:0;background:none;padding:12px 4px 10px;font-size:11px;font-weight:700;color:var(--muted);
+  }
+  .tabbar button.on{color:var(--gold-dark);}
+  .empty-msg{text-align:center;color:#cfe8da;font-size:13px;padding:30px 10px;}
+  .top-actions{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;}
+  .back-link{color:#cfe8da;font-size:13px;font-weight:700;background:none;border:none;padding:4px 0;}
+  .small-note{font-size:12px;color:var(--muted);margin-top:6px;}
+  .history-item{border-top:1px solid var(--line);padding:9px 0;font-size:13px;}
+  .history-item:first-child{border-top:none;}
+  .vido-log-row{font-size:12px;color:var(--muted);padding:3px 0;}
+  .total-row{display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--line);font-size:15px;}
+  .total-row:first-child{border-top:none;}
+  .total-row .nm{font-weight:700;}
+  .session-label{color:#fff;font-weight:800;font-size:15px;}
+
+  .pw-dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--line);background:transparent;transition:background .1s;}
+  .pw-dot.filled{background:var(--gold-dark);border-color:var(--gold-dark);}
+  .pw-key{
+    padding:16px 0;border-radius:12px;border:1.5px solid var(--line);
+    background:var(--card-soft);font-size:20px;font-weight:700;color:var(--ink);
+  }
+  .pw-key:active{background:var(--line);}
+  .pw-key-empty{visibility:hidden;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>TAVLA</h1>
+  <small>ORTAKLI TAKİP</small>
+</header>
+
+<div class="wrap">
+
+  <!-- SCREEN 1: PLAYERS / SETTINGS -->
+  <div class="screen" id="s1">
+    <div class="card">
+      <h2>Birim Tutar (₺)</h2>
+      <input type="number" id="unitAmountInput" placeholder="Örn: 10" inputmode="decimal">
+      <button class="btn-main" id="saveUnitBtn">Kaydet</button>
+    </div>
+
+    <div class="card">
+      <h2>Oyuncular (Genel Liste)</h2>
+      <div class="row">
+        <input type="text" id="newPlayerInput" placeholder="Oyuncu adı">
+        <button class="btn-soft" id="addPlayerBtn" style="flex:0 0 70px;">Ekle</button>
+      </div>
+      <div class="chip-list" id="playerChipList"></div>
+    </div>
+
+    <div class="card">
+      <h2>Başlangıç Bakiyeleri (Bir Defalık)</h2>
+      <div class="small-note">Uygulamayı kullanmaya başlamadan önceki hesapları buradan girin. Pozitif = alacaklı, negatif = borçlu. Bu değerler "Tüm Oturumlar" toplamına bir kere eklenir.</div>
+      <div id="startingBalanceWrap" style="margin-top:8px;"></div>
+      <button class="btn-soft btn-block" id="lockBalancesBtn" style="margin-top:10px;">Bakiyeleri Kilitle</button>
+      <div id="balancesLockedNote" style="display:none;text-align:center;margin-top:10px;">
+        <div class="small-note" style="font-weight:700;">🔒 Başlangıç bakiyeleri kilitli, değiştirilemez.</div>
+        <button class="btn-ghost" id="unlockBalancesBtn">Kilidi Aç (Düzenlemek İçin)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 2: SESSION + TABLES -->
+  <div class="screen active" id="s2">
+
+    <div id="sessionSetupView">
+      <div class="card">
+        <h2>Bugün Kim Var?</h2>
+        <div class="small-note">Oturumu başlatmadan önce bugün oynayacak oyuncuları seçin (en az 2).</div>
+        <div class="player-pick" id="sessionPlayerPickWrap"></div>
+      </div>
+      <button class="btn-main" id="startSessionBtn">Oturumu Başlat</button>
+    </div>
+
+    <div id="sessionTablesView" style="display:none;">
+      <div class="top-actions">
+        <span class="session-label" id="sessionNameLabel"></span>
+        <button class="btn-soft btn-sm" id="newTableBtn">+ Yeni Masa</button>
+      </div>
+
+      <div class="card">
+        <h2>Oturumdaki Oyuncular</h2>
+        <div class="row">
+          <input type="text" id="addSessionPlayerInput" placeholder="Sonradan katılan oyuncu adı">
+          <button class="btn-soft" id="addSessionPlayerBtn" style="flex:0 0 70px;">Ekle</button>
+        </div>
+        <div class="small-note">Yeni eklenen oyuncu, sıradaki ilk rakip olarak rotasyona girer. Çıkarma/ekleme sadece eller arasında yapılabilir - canlı bir elde olan oyuncu önce o el bitirilmeden çıkarılamaz.</div>
+        <div id="sessionPlayerListWrap" style="margin-top:10px;"></div>
+      </div>
+
+      <div id="tableListWrap"></div>
+      <div class="empty-msg" id="noTableMsg">Henüz masa yok. "+ Yeni Masa" ile başlayın.</div>
+      <button class="btn-soft btn-block" id="closeSessionBtn2" style="margin-top:16px;">Oturumu Kapat</button>
+      <button class="btn-danger btn-block" id="deleteSessionBtn" style="margin-top:8px;">Bu Oturumu Sil</button>
+    </div>
+
+  </div>
+
+  <!-- SCREEN 3: TABLE SETUP -->
+  <div class="screen" id="s3">
+    <div class="top-actions">
+      <button class="back-link" data-go="s2">← Masalar</button>
+      <span id="setupTableName" style="color:#fff;font-weight:800;"></span>
+    </div>
+
+    <div id="diceSetupView">
+      <div class="card">
+        <h2>Zar Sırası (Büyükten Küçüğe)</h2>
+        <div class="small-note">Bugünkü oyunculara, zar attıkları sıraya göre (en büyükten en küçüğe) dokunun.</div>
+        <div class="player-pick" id="diceRankPickWrap"></div>
+        <div class="small-note" id="diceRankResult" style="margin-top:10px;font-weight:700;"></div>
+        <button class="btn-ghost" id="diceResetBtn">Sıralamayı Sıfırla</button>
+      </div>
+      <button class="btn-main" id="startDiceGameBtn">Zar Sırasıyla Eli Başlat</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 4: GAME SCREEN -->
+  <div class="screen" id="s4">
+    <div class="top-actions">
+      <button class="back-link" data-go="s2">← Masalar</button>
+      <span id="gameTableName" style="color:#fff;font-weight:800;"></span>
+      <button class="back-link" id="editSeatsBtn">Düzenle</button>
+    </div>
+
+    <div class="card">
+      <div class="unit-note" id="unitNote"></div>
+      <div class="small-note" id="rotationNote" style="text-align:center;display:none;"></div>
+      <div id="autoVidoBand" style="display:none;text-align:center;background:var(--gold-dark);color:#fff;border-radius:8px;padding:5px 12px;font-size:13px;font-weight:700;margin-bottom:6px;">🎲 Otomatik vidolu el · x2</div>
+
+      <div class="side-box A" id="sideABox"></div>
+      <div class="side-box B" id="sideBBox"></div>
+
+      <div id="liveControls">
+        <div style="text-align:right;margin-bottom:4px;">
+          <button class="btn-soft btn-sm" id="undoHandBtn" style="font-size:12px;padding:4px 10px;">↩ Bu eli geri al</button>
+        </div>
+        <button class="btn-main" id="vidoCalledBtn">🎲 Vido Çekildi</button>
+        <div class="row" style="margin-top:16px;">
+          <button class="btn-main" id="aWinsBtn">A Kazandı</button>
+          <button class="btn-main" id="bWinsBtn">B Kazandı</button>
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <button class="btn-soft" id="aMarsBtn">⭐ A Mars</button>
+          <button class="btn-soft" id="bMarsBtn">⭐ B Mars</button>
+        </div>
+      </div>
+
+      <div id="finishedPanel" style="display:none;">
+        <h2 style="margin-top:14px;">El Sonucu</h2>
+        <div id="finishedResults"></div>
+        <button class="btn-main" id="nextHandBtn">Yeni El Başlat</button>
+      </div>
+    </div>
+
+    <div class="card" id="vidoLogCard" style="display:none;">
+      <h2>Vido Geçmişi (bu el)</h2>
+      <div id="vidoLogWrap"></div>
+    </div>
+  </div>
+
+  <!-- SCREEN 5: VIDO ÇEKİLDİ -->
+  <div class="screen" id="s5">
+    <div class="top-actions">
+      <button class="back-link" data-go="s4">← Vazgeç</button>
+      <span style="color:#fff;font-weight:800;">Vido Çekildi</span>
+    </div>
+    <div class="card">
+      <h2>Vido Çekenler</h2>
+      <div class="small-note">Vidoyu çeken oyuncuları seçin (genelde ortaklar birlikte çeker).</div>
+      <div class="player-pick" id="vidoCallersWrap"></div>
+    </div>
+    <div class="card" id="vidoSeersCard" style="display:none;">
+      <h2>Vidoyu Görenler</h2>
+      <div class="small-note">Varsayılan olarak herkes görmüş kabul edilir. Görmeyene dokunup kaldırın.</div>
+      <div id="vidoSeersWrap"></div>
+    </div>
+    <button class="btn-main" id="confirmVidoBtn">Onayla</button>
+  </div>
+
+  <!-- SCREEN 6: HISTORY / TOTALS -->
+  <div class="screen" id="s6">
+    <div class="top-actions">
+      <span style="color:#fff;font-weight:800;">Toplamlar</span>
+    </div>
+    <div class="card">
+      <h2>Oturum</h2>
+      <select id="totalsSessionSelect"></select>
+      <button class="btn-ghost" id="deleteTotalsSessionBtn" style="display:none;color:var(--red);">Bu Oturumu Sil</button>
+    </div>
+    <div class="card">
+      <h2>Toplam (₺)</h2>
+      <div class="small-note" id="totalsScopeNote" style="margin-bottom:6px;"></div>
+      <div id="grandTotalsWrap"></div>
+      <button class="btn-soft btn-block" id="shareWhatsappTotalsBtn" style="margin-top:10px;">📲 Görsel Olarak Paylaş</button>
+    </div>
+    <div class="card" id="addPaymentCard">
+      <h2>Ödeme Yap</h2>
+      <div class="small-note" style="margin-bottom:10px;">Gerçekte kim kime ne kadar ödedi?</div>
+      <label>Ödeyen</label>
+      <select id="paymentFromSelect2"></select>
+      <label>Alan</label>
+      <select id="paymentToSelect2"></select>
+      <label>Tutar (₺)</label>
+      <div class="row">
+        <input type="number" id="paymentAmountInput2" placeholder="Örn: 50">
+        <button class="btn-soft" id="addPaymentBtn2" style="flex:0 0 70px;">Ekle</button>
+      </div>
+      <div id="paymentListWrap2" style="margin-top:10px;"></div>
+      <div style="margin-top:12px;padding:12px;background:var(--bg);border-radius:8px;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:6px;color:var(--gold-dark);">Kalan Bakiye</div>
+        <div id="remainingBalancePreview2"></div>
+      </div>
+    </div>
+    <div class="card" id="paymentsCard" style="display:none;">
+      <h2>Yapılan Ödemeler</h2>
+      <div id="paymentsListView"></div>
+    </div>
+    <div class="card">
+      <h2>El Geçmişi</h2>
+      <div id="allHistoryWrap"></div>
+    </div>
+  </div>
+
+  <!-- SCREEN 7: CLOSE SESSION (PAYMENTS) -->
+  <div class="screen" id="s7">
+    <div class="top-actions">
+      <button class="back-link" data-go="s2">← Vazgeç</button>
+      <span style="color:#fff;font-weight:800;">Oturumu Kapat</span>
+    </div>
+    <div class="card">
+      <h2>Hesaplanan Bakiye</h2>
+      <div class="small-note">Bu oturumdaki el sonuçlarına göre kim kime ne kadar borçlu.</div>
+      <div id="closeSessionTotals" style="margin-top:8px;"></div>
+    </div>
+    <div class="card">
+      <h2>Yapılan Ödemeyi Girin</h2>
+      <div class="small-note">Gerçekte kim kime ne kadar ödedi? Birden fazla ödeme ekleyebilirsiniz.</div>
+      <label>Ödeyen</label>
+      <select id="paymentFromSelect"></select>
+      <label>Alan</label>
+      <select id="paymentToSelect"></select>
+      <label>Tutar (₺)</label>
+      <div class="row">
+        <input type="number" id="paymentAmountInput" placeholder="Örn: 50">
+        <button class="btn-soft" id="addPaymentBtn" style="flex:0 0 70px;">Ekle</button>
+      </div>
+      <div id="paymentListWrap" style="margin-top:10px;"></div>
+    </div>
+    <div class="card">
+      <h2>Kalan Bakiye (Ödemeler Sonrası)</h2>
+      <div id="remainingBalancePreview"></div>
+      <button class="btn-soft btn-block" id="shareWhatsappCloseBtn" style="margin-top:10px;">📲 Görsel Olarak Paylaş</button>
+    </div>
+    <button class="btn-main" id="confirmCloseSessionBtn">Oturumu Kapat</button>
+  </div>
+
+</div>
+
+<!-- ŞİFRE MODALI -->
+<div id="pwModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:16px;padding:22px 20px;max-width:300px;width:100%;">
+    <h2 style="margin:0 0 8px;font-size:14px;color:var(--gold-dark);text-transform:uppercase;font-weight:700;letter-spacing:.5px;">Yönetici Şifresi</h2>
+    <div class="small-note" id="pwModalLabel" style="margin-bottom:14px;"></div>
+    <div id="pwDotsWrap" style="display:flex;justify-content:center;gap:14px;margin-bottom:18px;"></div>
+    <div id="pwKeypad" style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px;"></div>
+    <div class="row" style="margin-top:14px;">
+      <button class="btn-soft" id="pwModalCancel">Vazgeç</button>
+      <button class="btn-main" id="pwModalConfirm" style="margin-top:0;">Onayla</button>
+    </div>
+  </div>
+</div>
+
+<!-- OTOMATİK VİDO MODALI -->
+
+<!-- OTOMATİK VİDO MODALI -->
+<div id="autoVidoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:16px;padding:28px 24px;max-width:280px;width:100%;text-align:center;">
+    <div style="font-size:36px;margin-bottom:10px;">🎲</div>
+    <h2 style="margin:0 0 8px;font-size:18px;color:var(--gold-dark);font-weight:800;">Otomatik Vido</h2>
+    <div style="font-size:15px;color:#555;margin-bottom:22px;">Bu el <b style="color:var(--gold-dark);font-size:20px;">x2</b> ile başlıyor</div>
+    <button class="btn-main" id="autoVidoModalOk">Tamam</button>
+  </div>
+</div>
+
+<!-- FORMAT SEÇİM MODALI (4 kişide) -->
+<div id="formatModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:16px;padding:22px 20px;max-width:300px;width:100%;">
+    <h2 style="margin:0 0 8px;font-size:14px;color:var(--gold-dark);text-transform:uppercase;font-weight:700;letter-spacing:.5px;">Oyun Formatı</h2>
+    <div class="small-note" style="margin-bottom:18px;">4 kişiyle nasıl oynanacak?</div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button class="btn-main" id="format1v3Btn">1'e 3</button>
+      <button class="btn-soft" id="format2v2Btn">2'ye 2</button>
+    </div>
+  </div>
+</div>
+
+<div class="tabbar">
+  <button data-go="s1" id="tabPlayers">OYUNCULAR</button>
+  <button data-go="s2" id="tabTables">MASALAR</button>
+  <button data-go="s6" id="tabTotals">TOPLAMLAR</button>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<script>
+/* ===================== FIREBASE CONFIG ===================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyAdH8QxoGPGxQ_clLY3mAA2bptKwr5_A68",
+  authDomain: "tavla-takip.firebaseapp.com",
+  databaseURL: "https://tavla-takip-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "tavla-takip",
+  storageBucket: "tavla-takip.firebasestorage.app",
+  messagingSenderId: "481796717146",
+  appId: "1:481796717146:web:d051b2dbfe0d27a87ef663"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const ROOT = db.ref("tavla");
+
+/* ===================== LOCAL STATE ===================== */
+let STATE = {
+  players: {},
+  settings: { unitAmount: 0 },
+  startingBalances: {},
+  startingBalancesLocked: false,
+  sessions: {},
+  activeSessionId: null,
+  tables: {}
+};
+let currentScreen = "s2";
+let currentTableId = null;
+let dicePick = { ranking: [] };
+let selectedVidoCallers = [];
+let selectedVidoSeers = {};
+let sessionPlayerPick = {};
+let forcingNewSession = false;
+let totalsSelectedSession = null;
+let lastTotalsShareData = null;
+let pendingPayments = [];
+
+/* ===================== FIREBASE SYNC ===================== */
+ROOT.on("value", snap => {
+  const val = snap.val() || {};
+  STATE.players = val.players || {};
+  STATE.settings = val.settings || { unitAmount: 0 };
+  STATE.startingBalances = val.startingBalances || {};
+  STATE.startingBalancesLocked = !!val.startingBalancesLocked;
+  STATE.sessions = val.sessions || {};
+  STATE.activeSessionId = val.activeSessionId || null;
+  const activeSession = STATE.activeSessionId ? STATE.sessions[STATE.activeSessionId] : null;
+  STATE.tables = activeSession ? (activeSession.tables || {}) : {};
+  renderAll();
+});
+
+function fbSet(path, value){ ROOT.child(path).set(value); }
+function fbPush(path, value){ return ROOT.child(path).push(value); }
+function fbUpdate(path, value){ ROOT.child(path).update(value); }
+function fbRemove(path){ ROOT.child(path).remove(); }
+function tablesPath(){ return `sessions/${STATE.activeSessionId}/tables`; }
+function getSessionPlayerNames(){
+  const s = STATE.activeSessionId ? STATE.sessions[STATE.activeSessionId] : null;
+  return s ? Object.keys(s.activePlayers||{}) : [];
+}
+function formatSessionName(d){
+  const aylar = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
+  return `${d.getDate()} ${aylar[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+/* ===================== KİŞİ-KİŞİ VİDO YARDIMCILARI =====================
+   Her ikili (A tarafından biri × B tarafından biri) kendi bağımsız vido
+   sayacına sahiptir. Değer = 2^sayac. Biri vido çekip karşısındaki görürse
+   SADECE o ikilinin sayacı artar, başka kimse etkilenmez. Görmezse o ikili
+   o anki değerle kapanır (kalıcı sonuç). Oturan-oturan ikilisi kapanırsa
+   (yani fiilen oynayan taraflardan biri vidoyu görmezse) el biter. */
+function sideOf(t, name){
+  if (t.seated.A === name) return "A";
+  if (t.seated.B === name) return "B";
+  if ((t.partners.A||{})[name]) return "A";
+  if ((t.partners.B||{})[name]) return "B";
+  return null;
+}
+function sideNames(t, side){
+  return [t.seated[side], ...Object.keys((t.partners&&t.partners[side])||{})];
+}
+function getPairCell(t, name1, name2){
+  const s1 = sideOf(t, name1);
+  const aName = s1 === "A" ? name1 : name2;
+  const bName = s1 === "A" ? name2 : name1;
+  return { aName, bName, p: (t.game.pairs[aName]||{})[bName] };
+}
+function callableTargets(t, name){
+  const side = sideOf(t, name);
+  const g = t.game;
+  const targets = [];
+  if (side === "A"){
+    Object.entries(g.pairs[name]||{}).forEach(([b,p])=>{
+      if (!p.closed && p.blockedCaller !== name) targets.push(b);
+    });
+  } else if (side === "B"){
+    sideNames(t,"A").forEach(a=>{
+      const p = (g.pairs[a]||{})[name];
+      if (p && !p.closed && p.blockedCaller !== name) targets.push(a);
+    });
+  }
+  return targets;
+}
+/* Tabloda (her iki taraf arasında) hâlâ açık (kapanmamış) herhangi bir
+   ikili kaldı mı? Oturan kendi vidosunu reddetse bile, masada (kimde
+   olursa olsun) açık bir hesap kaldığı sürece oturan onlar adına
+   oynamaya devam eder; el ancak HERKES kapandığında biter. */
+function anyOpenPairsRemain(t){
+  const aNames = sideNames(t, "A");
+  const bNames = sideNames(t, "B");
+  for (const a of aNames){
+    for (const b of bNames){
+      const p = (t.game.pairs[a]||{})[b];
+      if (p && !p.closed) return true;
+    }
+  }
+  return false;
+}
+function buildInitialGame(seated, partners){
+  const fakeT = { seated, partners };
+  const aNames = sideNames(fakeT, "A");
+  const bNames = sideNames(fakeT, "B");
+  const pairs = {};
+  aNames.forEach(a=>{
+    pairs[a] = {};
+    bNames.forEach(b=>{
+      pairs[a][b] = { count:0, closed:false, blockedCaller:null };
+    });
+  });
+  return { finished:false, pairs, vidoLog:[] };
+}
+
+/* ===================== NAV ===================== */
+document.querySelectorAll("[data-go]").forEach(el=>{
+  el.addEventListener("click", ()=> goScreen(el.getAttribute("data-go")));
+});
+function goScreen(id, tableId){
+  currentScreen = id;
+  if (tableId !== undefined) currentTableId = tableId;
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  document.querySelectorAll(".tabbar button").forEach(b=>b.classList.remove("on"));
+  const tabMap = {s1:"tabPlayers", s2:"tabTables", s6:"tabTotals"};
+  if (tabMap[id]) document.getElementById(tabMap[id]).classList.add("on");
+  renderAll();
+}
+
+/* ===================== RENDER DISPATCH ===================== */
+function renderAll(){
+  renderPlayersScreen();
+  renderSessionScreen();
+  if (currentScreen === "s3") renderSetupScreen();
+  if (currentScreen === "s4") renderGameScreen();
+  if (currentScreen === "s5") renderVidoCallersAndSeers();
+  if (currentScreen === "s6") renderTotalsScreen();
+  if (currentScreen === "s7") renderCloseSessionScreen();
+}
+
+/* ===================== SCREEN 1: PLAYERS / SETTINGS ===================== */
+function renderPlayersScreen(){
+  const inp = document.getElementById("unitAmountInput");
+  if (document.activeElement !== inp) inp.value = STATE.settings.unitAmount || "";
+  const wrap = document.getElementById("playerChipList");
+  wrap.innerHTML = "";
+  Object.entries(STATE.players).forEach(([id,name])=>{
+    const chip = document.createElement("div");
+    chip.className = "chip";
+    chip.innerHTML = `<span>${escapeHtml(name)}</span><button data-pid="${id}">×</button>`;
+    chip.querySelector("button").addEventListener("click", ()=>{
+      if (confirm(`${name} silinsin mi?`)) fbRemove(`players/${id}`);
+    });
+    wrap.appendChild(chip);
+  });
+  renderStartingBalances();
+}
+
+function renderStartingBalances(){
+  const wrap = document.getElementById("startingBalanceWrap");
+  const locked = !!STATE.startingBalancesLocked;
+  document.getElementById("lockBalancesBtn").style.display = locked ? "none" : "block";
+  document.getElementById("balancesLockedNote").style.display = locked ? "block" : "none";
+
+  const names = Object.values(STATE.players);
+  if (!names.length){
+    wrap.innerHTML = `<div class="small-note">Önce yukarıdan oyuncu ekleyin.</div>`;
+    return;
+  }
+  wrap.innerHTML = "";
+  names.forEach(name=>{
+    const row = document.createElement("div");
+    row.className = "row";
+    row.style.marginBottom = "6px";
+    row.style.alignItems = "center";
+    const safeId = "startbal-" + name.replace(/[^a-zA-Z0-9]/g, "_");
+    row.innerHTML = `
+      <span style="flex:1.4;font-weight:600;font-size:14px;">${escapeHtml(name)}</span>
+      <input type="number" id="${safeId}" data-name="${escapeHtml(name)}" placeholder="0" style="flex:1;" ${locked ? "disabled" : ""}>
+    `;
+    wrap.appendChild(row);
+    const inp = row.querySelector("input");
+    if (document.activeElement && document.activeElement.id === safeId){
+      // kullanıcı şu an bu kutuya yazıyor, değeri ezme
+    } else {
+      inp.value = STATE.startingBalances[name] || "";
+    }
+    if (locked) return; // kilitliyken kaydetme dinleyicileri gerekmez
+    inp.addEventListener("change", ()=>{
+      const v = parseFloat(inp.value) || 0;
+      if (v === 0) fbRemove(`startingBalances/${name}`);
+      else fbSet(`startingBalances/${name}`, v);
+    });
+    inp.addEventListener("blur", ()=>{
+      const v = parseFloat(inp.value) || 0;
+      if (v === 0) fbRemove(`startingBalances/${name}`);
+      else fbSet(`startingBalances/${name}`, v);
+    });
+  });
+}
+document.getElementById("lockBalancesBtn").addEventListener("click", ()=>{
+  if (confirm("Başlangıç bakiyeleri kilitlensin mi? Kilitledikten sonra yanlışlıkla değiştirilemez (gerekirse sonra kilidi açabilirsin).")){
+    fbSet("startingBalancesLocked", true);
+  }
+});
+document.getElementById("unlockBalancesBtn").addEventListener("click", ()=>{
+  askPassword("Bakiye kilidini açma", ()=>{
+    if (confirm("Kilidi açmak istediğine emin misin? Açıldıktan sonra bakiyeler tekrar değiştirilebilir olur.")){
+      fbSet("startingBalancesLocked", false);
+    }
+  });
+});
+function saveUnitAmount(){
+  const v = parseFloat(document.getElementById("unitAmountInput").value) || 0;
+  fbSet("settings/unitAmount", v);
+}
+document.getElementById("saveUnitBtn").addEventListener("click", saveUnitAmount);
+document.getElementById("unitAmountInput").addEventListener("change", saveUnitAmount);
+document.getElementById("unitAmountInput").addEventListener("blur", saveUnitAmount);
+
+/* ===================== ŞİFRE MODALI =====================
+   Hassas işlemler (bakiye kilidi açma, oturum silme) için sabit
+   yönetici şifresi. iOS'un numara alanlarında bazen kendi "kod öner"
+   arayüzünü göstermesi gibi tuhaflıkları önlemek için tamamen
+   ekran-içi (native klavye kullanmayan) bir tuş takımı ile girilir. */
+const ADMIN_PASSWORD = "2580";
+let pwModalOnSuccess = null;
+let pwEnteredDigits = "";
+
+function askPassword(actionLabel, onSuccess){
+  document.getElementById("pwModalLabel").textContent = `${actionLabel} için şifreyi girin:`;
+  pwEnteredDigits = "";
+  pwModalOnSuccess = onSuccess;
+  renderPwKeypad();
+  renderPwDots();
+  document.getElementById("pwModalOverlay").style.display = "flex";
+}
+function closePwModal(){
+  document.getElementById("pwModalOverlay").style.display = "none";
+  pwModalOnSuccess = null;
+  pwEnteredDigits = "";
+}
+function renderPwDots(){
+  const wrap = document.getElementById("pwDotsWrap");
+  wrap.innerHTML = "";
+  const len = Math.max(ADMIN_PASSWORD.length, pwEnteredDigits.length);
+  for (let i=0;i<len;i++){
+    const dot = document.createElement("div");
+    dot.className = "pw-dot" + (i < pwEnteredDigits.length ? " filled" : "");
+    wrap.appendChild(dot);
+  }
+}
+function renderPwKeypad(){
+  const keypad = document.getElementById("pwKeypad");
+  if (keypad.childElementCount) return; // tuş takımı sabit, tekrar çizmeye gerek yok
+  const keys = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
+  keys.forEach(k=>{
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "pw-key" + (k==="" ? " pw-key-empty" : "");
+    btn.textContent = k;
+    if (k !== ""){
+      btn.addEventListener("click", ()=>{
+        if (k === "⌫") pwEnteredDigits = pwEnteredDigits.slice(0, -1);
+        else if (pwEnteredDigits.length < 8) pwEnteredDigits += k;
+        renderPwDots();
+      });
+    }
+    keypad.appendChild(btn);
+  });
+}
+document.getElementById("pwModalCancel").addEventListener("click", closePwModal);
+document.getElementById("pwModalOverlay").addEventListener("click", (e)=>{
+  if (e.target.id === "pwModalOverlay") closePwModal();
+});
+document.getElementById("pwModalConfirm").addEventListener("click", ()=>{
+  const cb = pwModalOnSuccess;
+  if (pwEnteredDigits === ADMIN_PASSWORD){
+    closePwModal();
+    if (cb) cb();
+  } else {
+    alert("Şifre yanlış.");
+    pwEnteredDigits = "";
+    renderPwDots();
+  }
+});
+
+/* ===================== OTOMATİK VİDO MODALI ===================== */
+/* ===================== OTOMATİK VİDO (her 3. el) =====================
+   Her 3. elde otomatik 1 vido (2x) uygulanır.
+   Eğer bir elde mars olursa veya oturan biri "Görmedi" derse,
+   bir sonraki el de otomatik vido ile başlar ve sayaç sıfırlanır.
+   Masa üzerinde saklanır: { autoVidoNextHand, handsSinceReset } */
+
+function shouldAutoVido(t){
+  return !!t.autoVidoNextHand;
+}
+
+document.getElementById("addPlayerBtn").addEventListener("click", addPlayerFromInput);
+document.getElementById("newPlayerInput").addEventListener("keydown", e=>{
+  if (e.key === "Enter") addPlayerFromInput();
+});
+function addPlayerFromInput(){
+  const inp = document.getElementById("newPlayerInput");
+  const name = inp.value.trim();
+  if (!name) return;
+  fbPush("players", name);
+  inp.value = "";
+}
+
+/* ===================== SCREEN 2: SESSION + TABLES ===================== */
+function renderSessionScreen(){
+  const hasActive = STATE.activeSessionId && STATE.sessions[STATE.activeSessionId];
+  const showSetup = !hasActive || forcingNewSession;
+  document.getElementById("sessionSetupView").style.display = showSetup ? "block" : "none";
+  document.getElementById("sessionTablesView").style.display = showSetup ? "none" : "block";
+  if (showSetup){
+    renderSessionPlayerPick();
+  } else {
+    document.getElementById("sessionNameLabel").textContent = STATE.sessions[STATE.activeSessionId].name;
+    renderSessionPlayerList();
+    renderTablesScreen();
+  }
+}
+
+function renderSessionPlayerPick(){
+  const wrap = document.getElementById("sessionPlayerPickWrap");
+  wrap.innerHTML = "";
+  const ids = Object.entries(STATE.players);
+  if (!ids.length){
+    wrap.innerHTML = `<div class="small-note">Önce "Oyuncular" sekmesinden oyuncu ekleyin.</div>`;
+    return;
+  }
+  ids.forEach(([id,name])=>{
+    const btn = document.createElement("button");
+    btn.className = "pick" + (sessionPlayerPick[name] ? " sel-on" : "");
+    btn.textContent = name;
+    btn.addEventListener("click", ()=>{
+      if (sessionPlayerPick[name]) delete sessionPlayerPick[name];
+      else sessionPlayerPick[name] = true;
+      renderSessionPlayerPick();
+    });
+    wrap.appendChild(btn);
+  });
+}
+
+document.getElementById("startSessionBtn").addEventListener("click", ()=>{
+  const chosen = Object.keys(sessionPlayerPick);
+  if (chosen.length < 2){
+    alert("Lütfen en az 2 oyuncu seçin.");
+    return;
+  }
+  const activePlayers = {};
+  chosen.forEach(n=> activePlayers[n] = true);
+  const ref = fbPush("sessions", {
+    name: formatSessionName(new Date()),
+    createdAt: Date.now(),
+    activePlayers,
+    tables: {}
+  });
+  fbSet("activeSessionId", ref.key);
+  forcingNewSession = false;
+  sessionPlayerPick = {};
+});
+
+/* ===================== OTURUMA SONRADAN OYUNCU EKLE / ÇIKAR ===================== */
+function renderSessionPlayerList(){
+  const wrap = document.getElementById("sessionPlayerListWrap");
+  const names = getSessionPlayerNames();
+  const s = STATE.sessions[STATE.activeSessionId];
+  const tables = (s && s.tables) || {};
+
+  // Şu an canlı (bitmemiş) bir elde yer alan isimleri topla.
+  const busyNames = new Set();
+  Object.values(tables).forEach(t=>{
+    if (t.game && !t.game.finished){
+      sideNames(t, "A").forEach(n=> busyNames.add(n));
+      sideNames(t, "B").forEach(n=> busyNames.add(n));
+    }
+  });
+
+  wrap.innerHTML = "";
+  names.forEach(name=>{
+    const isBusy = busyNames.has(name);
+    const chip = document.createElement("div");
+    chip.className = "chip";
+    chip.innerHTML = `<span>${escapeHtml(name)}</span><button data-name="${escapeHtml(name)}" ${isBusy ? 'disabled style="opacity:.35;"' : ''}>×</button>`;
+    if (!isBusy){
+      chip.querySelector("button").addEventListener("click", ()=> removeSessionPlayer(name));
+    }
+    wrap.appendChild(chip);
+  });
+  if (!names.length){
+    wrap.innerHTML = `<div class="small-note">Oturumda oyuncu yok.</div>`;
+  }
+}
+
+document.getElementById("addSessionPlayerBtn").addEventListener("click", addSessionPlayerFromInput);
+document.getElementById("addSessionPlayerInput").addEventListener("keydown", e=>{
+  if (e.key === "Enter") addSessionPlayerFromInput();
+});
+function addSessionPlayerFromInput(){
+  const inp = document.getElementById("addSessionPlayerInput");
+  const name = inp.value.trim();
+  if (!name) return;
+  const sid = STATE.activeSessionId;
+  const s = STATE.sessions[sid];
+  if (!s) return;
+  if ((s.activePlayers||{})[name]){ alert(`${name} zaten oturumda.`); return; }
+
+  if (!Object.values(STATE.players).includes(name)){
+    fbPush("players", name);
+  }
+  fbSet(`sessions/${sid}/activePlayers/${name}`, true);
+  inp.value = "";
+
+  Object.entries(s.tables||{}).forEach(([tid, t])=>{
+    if (!t.usesRotation || !t.rotation || !t.rotation.king) return;
+
+    const rawFO = t.rotation.fullOrder;
+    let fullOrder = Array.isArray(rawFO)
+      ? rawFO.slice()
+      : (rawFO && typeof rawFO === 'object')
+        ? Object.keys(rawFO).sort((a,b)=>+a-+b).map(k=>rawFO[k])
+        : Array.isArray(t.rotation.queue)
+          ? [...(t.rotation.kingHelper ? [t.rotation.kingHelper] : []), ...t.rotation.queue, t.seated && t.seated.B].filter(Boolean)
+          : [];
+
+    if (!fullOrder.length) return;
+
+    const loser = fullOrder[fullOrder.length - 1];
+    const rest  = fullOrder.slice(0, -1);
+    fullOrder = [...rest, name, loser];
+
+    fbSet(`${tablesPath()}/${tid}/rotation/fullOrder`, fullOrder);
+  });
+}
+
+/* Bir masanın TAMAMINI (kayıtlı rotation bilgisine göre) tek bir
+   listede toplar, belirtilen ismi bu listeden tamamen eler ve
+   kalanlarla yeni bir "sıradaki tam liste" kurar. İki rotation formatını
+   da destekler: eski format (ilk kurulumdan kalma: king+kingHelper+
+   queue, + ayrıca t.seated.B) ve yeni format (el bittikten sonra
+   finishHand'in bıraktığı: king+fullOrder). */
+function rebuildRotationWithoutName(t, name){
+  if (!t.rotation || !t.rotation.king) return null;
+  let fullList;
+  if (Array.isArray(t.rotation.fullOrder)){
+    fullList = [t.rotation.king, ...t.rotation.fullOrder.filter(n=>n!==t.rotation.king)];
+  } else {
+    fullList = [t.rotation.king];
+    if (t.rotation.kingHelper) fullList.push(t.rotation.kingHelper);
+    if (t.seated && t.seated.B) fullList.push(t.seated.B); // mevcut challenger
+    if (Array.isArray(t.rotation.queue)) fullList.push(...t.rotation.queue);
+  }
+
+  const remaining = fullList.filter(n=>n!==name);
+  if (!remaining.length) return null; // oturumda kimse kalmadı
+
+  const newKing = remaining[0];
+  const newQueueFull = remaining.slice(1);
+  return seatFromRotation(newKing, null, newQueueFull);
+}
+
+function removeSessionPlayer(name){
+  const sid = STATE.activeSessionId;
+  const s = STATE.sessions[sid];
+  if (!s) return;
+
+  // Canlı (bitmemiş) bir elde oturuyor/ortaksa çıkarmaya izin verme -
+  // önce "A Kazandı"/"B Kazandı" ile o el kapatılmalı.
+  const liveTableNames = [];
+  Object.values(s.tables||{}).forEach(t=>{
+    if (t.game && !t.game.finished && sideOf(t, name)){
+      liveTableNames.push(t.name);
+    }
+  });
+  if (liveTableNames.length){
+    alert(`${name} şu an "${liveTableNames.join(", ")}" masasında devam eden bir elde yer alıyor. Önce o eli "A Kazandı" / "B Kazandı" ile bitirin, sonra oyuncuyu çıkarabilirsiniz.`);
+    return;
+  }
+
+  if (!confirm(`${name} oturumdan çıkarılsın mı?`)) return;
+
+  try{
+    // Bu oyuncunun yer aldığı (ama artık canlı olmayan, yani el bitmiş
+    // veya hiç başlamamış) rotasyonlu masaları, kalan oyunculara göre
+    // yeniden kur. seated/partners de güncellenir ki masa listesinde
+    // doğru görünsün; ama gerçek "oturma" "Yeni El Başlat" anında
+    // GÜNCEL oyuncu listesiyle tekrar teyit edilerek kurulacaktır.
+    Object.entries(s.tables||{}).forEach(([tid, t])=>{
+      if (!t.usesRotation || !t.rotation) return;
+      const next = rebuildRotationWithoutName(t, name);
+      if (next){
+        const kH = Object.keys(next.partners.A)[0] || null;
+        const bHelpers = Object.keys(next.partners.B);
+        const challenger = next.seated.B;
+        const correctFullOrder = [challenger, ...bHelpers];
+        if (kH) correctFullOrder.push(kH);
+        fbUpdate(`${tablesPath()}/${tid}`, {
+          seated: next.seated,
+          partners: next.partners,
+          rotation: { king: next.rotation.king, fullOrder: correctFullOrder }
+        });
+      }
+    });
+
+    // Oyuncuyu oturumdan çıkar.
+    fbRemove(`sessions/${sid}/activePlayers/${name}`);
+  } catch(e){
+    console.error(e);
+    alert("Oyuncu çıkarılırken bir hata oluştu: " + e.message);
+  }
+}
+
+document.getElementById("deleteSessionBtn").addEventListener("click", ()=>{
+  const s = STATE.sessions[STATE.activeSessionId];
+  if (!s) return;
+  askPassword("Oturumu silme", ()=>{
+    if (confirm(`"${s.name}" oturumu ve içindeki tüm masalar/geçmiş tamamen silinsin mi? Bu işlem geri alınamaz.`)){
+      fbRemove(`sessions/${STATE.activeSessionId}`);
+      fbSet("activeSessionId", null);
+      sessionPlayerPick = {};
+      forcingNewSession = false;
+    }
+  });
+});
+
+/* ===================== OTURUMU KAPAT (ÖDEME GİRİŞİ) ===================== */
+function computeSessionHandTotals(session){
+  const totals = {};
+  Object.values((session&&session.tables)||{}).forEach(t=>{
+    Object.values(t.history||{}).forEach(h=>{
+      Object.entries(h.results||{}).forEach(([name,r])=>{
+        const val = (r && typeof r === "object") ? (r.total||0) : (r||0);
+        totals[name] = (totals[name]||0) + val;
+      });
+    });
+  });
+  return totals;
+}
+function applyPaymentsToTotals(totals, payments){
+  (payments||[]).forEach(p=>{
+    totals[p.from] = (totals[p.from]||0) + p.amount;
+    totals[p.to] = (totals[p.to]||0) - p.amount;
+  });
+  return totals;
+}
+function renderBalanceList(container, totals){
+  const sorted = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
+  container.innerHTML = sorted.length ? sorted.map(([name,amt])=>{
+    const cls = amt>=0?"pos":"neg";
+    const sign = amt>=0?"+":"";
+    return `<div class="total-row"><span class="nm">${escapeHtml(name)}</span><span class="amt ${cls}">${sign}${amt.toFixed(2)} ₺</span></div>`;
+  }).join("") : `<div class="small-note">Henüz tamamlanmış el yok.</div>`;
+}
+
+/* ===================== GÖRSEL KART OLARAK PAYLAŞ =====================
+   Hesap tablosunu, Pişti'deki gibi büyük fontlu okunaklı bir görsel
+   (PNG) kart olarak çizip telefonun paylaşım penceresinden (WhatsApp
+   dahil) gönderir. */
+function drawRoundedRect(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  if (ctx.roundRect){ ctx.roundRect(x, y, w, h, r); }
+  else {
+    ctx.moveTo(x+r, y);
+    ctx.arcTo(x+w, y, x+w, y+h, r);
+    ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r);
+    ctx.arcTo(x, y, x+w, y, r);
+  }
+  ctx.closePath();
+}
+
+function buildShareCanvas(title, subtitle, totals, payments){
+  const W = 900;
+  const rowH = 86;
+  const sorted = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
+  const payRows = payments && payments.length ? payments.length : 0;
+
+  let H = 300; // başlık + tarih alanı
+  H += sorted.length ? sorted.length * rowH : rowH;
+  if (payRows){ H += 90 + payRows * rowH; } // ödemeler başlığı + satırları
+  H += 60; // alt boşluk
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+
+  // arka plan (koyu yeşil gradyan)
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, "#0f4d3a");
+  grad.addColorStop(1, "#0b3d2e");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  let y = 70;
+  ctx.textAlign = "center";
+
+  // başlık
+  ctx.fillStyle = "#d4a44c";
+  ctx.font = "900 56px -apple-system, system-ui, sans-serif";
+  ctx.fillText("TAVLA", W/2, y);
+  y += 36;
+
+  ctx.fillStyle = "#cfe8da";
+  ctx.font = "700 20px -apple-system, system-ui, sans-serif";
+  ctx.fillText("O R T A K L I   T A K İ P", W/2, y);
+  y += 44;
+
+  ctx.fillStyle = "#e8e8e0";
+  ctx.font = "600 26px -apple-system, system-ui, sans-serif";
+  ctx.fillText(subtitle, W/2, y);
+  y += 28;
+
+  // ayraç çizgisi
+  ctx.strokeStyle = "rgba(212,164,76,0.6)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(60, y);
+  ctx.lineTo(W-60, y);
+  ctx.stroke();
+  y += 20;
+
+  ctx.fillStyle = "#d4a44c";
+  ctx.font = "800 24px -apple-system, system-ui, sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText("BAKİYE", 60, y + 28);
+  y += 52;
+
+  function drawRow(rank, name, amountText, isPositive){
+    drawRoundedRect(ctx, 50, y, W-100, rowH-14, 16);
+    ctx.fillStyle = "rgba(255,255,255,0.07)";
+    ctx.fill();
+
+    if (rank !== null){
+      ctx.fillStyle = "rgba(255,255,255,0.45)";
+      ctx.font = "600 22px -apple-system, system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText(String(rank), 78, y + (rowH-14)/2 + 9);
+    }
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "700 32px -apple-system, system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(name, rank !== null ? 116 : 80, y + (rowH-14)/2 + 11);
+
+    ctx.fillStyle = isPositive ? "#3ddc84" : "#ff6b5e";
+    ctx.font = "800 34px -apple-system, system-ui, sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(amountText, W-80, y + (rowH-14)/2 + 12);
+
+    y += rowH;
+  }
+
+  if (sorted.length){
+    sorted.forEach(([name, amt], i)=>{
+      const sign = amt >= 0 ? "+" : "";
+      drawRow(i+1, name, `${sign}${amt.toFixed(2)} ₺`, amt >= 0);
+    });
+  } else {
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.font = "500 24px -apple-system, system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Henüz tamamlanmış el yok.", W/2, y + 30);
+    y += rowH;
+  }
+
+  if (payRows){
+    y += 30;
+    ctx.fillStyle = "#d4a44c";
+    ctx.font = "800 24px -apple-system, system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("ÖDEMELER", 60, y + 28);
+    y += 52;
+
+    payments.forEach(p=>{
+      drawRoundedRect(ctx, 50, y, W-100, rowH-14, 16);
+      ctx.fillStyle = "rgba(255,255,255,0.07)";
+      ctx.fill();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "700 28px -apple-system, system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText(`${p.from} → ${p.to}`, 80, y + (rowH-14)/2 + 10);
+
+      ctx.fillStyle = "#3ddc84";
+      ctx.font = "800 30px -apple-system, system-ui, sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText(`${p.amount.toFixed(2)} ₺`, W-80, y + (rowH-14)/2 + 11);
+
+      y += rowH;
+    });
+  }
+
+  return canvas;
+}
+
+async function shareBalanceCard(title, totals, payments){
+  try{
+    const canvas = buildShareCanvas("TAVLA", title, totals, payments);
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+    if (!blob){ alert("Görsel oluşturulamadı."); return; }
+    const file = new File([blob], "tavla-hesap.png", { type: "image/png" });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })){
+      await navigator.share({ files: [file], title: "Tavla Hesap Özeti" });
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "tavla-hesap.png";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(()=> URL.revokeObjectURL(url), 5000);
+      alert("Görsel indirildi. WhatsApp'tan resim olarak paylaşabilirsin.");
+    }
+  } catch(e){
+    if (e && e.name === "AbortError") return; // kullanıcı paylaşımı iptal etti
+    console.error(e);
+    alert("Paylaşım sırasında bir hata oluştu: " + e.message);
+  }
+}
+
+document.getElementById("closeSessionBtn2").addEventListener("click", ()=>{
+  if (!STATE.activeSessionId) return;
+  pendingPayments = [];
+  goScreen("s7");
+});
+
+document.getElementById("shareWhatsappCloseBtn").addEventListener("click", ()=>{
+  const s = STATE.sessions[STATE.activeSessionId];
+  if (!s) return;
+  const totals = computeSessionHandTotals(s);
+  applyPaymentsToTotals(totals, pendingPayments);
+  shareBalanceCard(s.name, totals, pendingPayments);
+});
+
+function renderCloseSessionScreen(){
+  const s = STATE.sessions[STATE.activeSessionId];
+  if (!s){ goScreen("s2"); return; }
+  const names = Object.keys(s.activePlayers||{});
+
+  const totals = computeSessionHandTotals(s);
+  renderBalanceList(document.getElementById("closeSessionTotals"), totals);
+
+  const fromSel = document.getElementById("paymentFromSelect");
+  const toSel = document.getElementById("paymentToSelect");
+  const optHtml = names.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+  if (fromSel.innerHTML !== optHtml) fromSel.innerHTML = optHtml;
+  if (toSel.innerHTML !== optHtml) toSel.innerHTML = optHtml;
+
+  const listWrap = document.getElementById("paymentListWrap");
+  listWrap.innerHTML = pendingPayments.length ? pendingPayments.map((p,i)=>`
+    <div class="result-line">
+      <span>${escapeHtml(p.from)} → ${escapeHtml(p.to)}</span>
+      <span class="amt pos" style="display:flex;align-items:center;gap:8px;">
+        ${p.amount.toFixed(2)} ₺
+        <button class="btn-danger btn-sm" data-idx="${i}">Sil</button>
+      </span>
+    </div>
+  `).join("") : `<div class="small-note">Henüz ödeme eklenmedi.</div>`;
+  listWrap.querySelectorAll("button[data-idx]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      pendingPayments.splice(parseInt(btn.getAttribute("data-idx")), 1);
+      renderCloseSessionScreen();
+    });
+  });
+
+  const remaining = applyPaymentsToTotals(Object.assign({}, totals), pendingPayments);
+  renderBalanceList(document.getElementById("remainingBalancePreview"), remaining);
+}
+
+document.getElementById("addPaymentBtn").addEventListener("click", ()=>{
+  const from = document.getElementById("paymentFromSelect").value;
+  const to = document.getElementById("paymentToSelect").value;
+  const amount = parseFloat(document.getElementById("paymentAmountInput").value);
+  if (!from || !to || from === to){ alert("Ödeyen ve alan farklı kişiler olmalı."); return; }
+  if (!amount || amount <= 0){ alert("Geçerli bir tutar girin."); return; }
+  pendingPayments.push({ from, to, amount });
+  document.getElementById("paymentAmountInput").value = "";
+  renderCloseSessionScreen();
+});
+
+document.getElementById("confirmCloseSessionBtn").addEventListener("click", ()=>{
+  const sid = STATE.activeSessionId;
+  const s = STATE.sessions[sid];
+  if (!s) return;
+  if (confirm(`"${s.name}" oturumu kapatılsın mı? Girdiğiniz ödemeler kaydedilecek ve bu oturum pasif hâle gelecek.`)){
+    fbUpdate(`sessions/${sid}`, {
+      closed: true,
+      closedAt: Date.now(),
+      payments: pendingPayments
+    });
+    fbSet("activeSessionId", null);
+    pendingPayments = [];
+    sessionPlayerPick = {};
+    forcingNewSession = false;
+    goScreen("s2");
+  }
+});
+
+document.getElementById("newTableBtn").addEventListener("click", ()=>{
+  const count = Object.keys(STATE.tables).length + 1;
+  const ref = fbPush(tablesPath(), {
+    name: `Masa ${count}`,
+    seated: {A:null, B:null},
+    partners: {A:{}, B:{}},
+    game: null,
+    history: {}
+  });
+  dicePick = { ranking:[] };
+  goScreen("s3", ref.key);
+});
+
+function renderTablesScreen(){
+  const wrap = document.getElementById("tableListWrap");
+  const ids = Object.keys(STATE.tables);
+  document.getElementById("noTableMsg").style.display = ids.length ? "none" : "block";
+  wrap.innerHTML = "";
+  ids.forEach(id=>{
+    const t = STATE.tables[id];
+    const card = document.createElement("div");
+    card.className = "table-card";
+    const live = t.game && !t.game.finished;
+    const seatedTxt = (t.seated && t.seated.A && t.seated.B)
+      ? `${t.seated.A} <span style="color:var(--muted)">vs</span> ${t.seated.B}`
+      : "Oyuncu seçilmedi";
+    card.innerHTML = `
+      <div class="t-head">
+        <span class="tname">${escapeHtml(t.name)} ${live?'<span class="badge live">CANLI</span>':''}</span>
+      </div>
+      <div class="t-sub">${seatedTxt}</div>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn-soft btn-sm" data-act="open">${live ? 'Devam Et' : (t.seated&&t.seated.A ? 'Yeni El' : 'Kur')}</button>
+        <button class="btn-soft btn-sm" data-act="edit">Düzenle</button>
+        <button class="btn-danger btn-sm" data-act="del">Sil</button>
+      </div>
+    `;
+    card.querySelector('[data-act="open"]').addEventListener("click", ()=>{
+      if (t.seated && t.seated.A && t.seated.B && (!t.game || t.game.finished)) {
+        if (!t.game) { startGameForTable(id); return; }
+      }
+      if (t.seated && t.seated.A && t.seated.B) { goScreen("s4", id); }
+      else { loadSetupPickFromTable(t); goScreen("s3", id); }
+    });
+    card.querySelector('[data-act="edit"]').addEventListener("click", ()=>{
+      loadSetupPickFromTable(t);
+      goScreen("s3", id);
+    });
+    card.querySelector('[data-act="del"]').addEventListener("click", ()=>{
+      if (confirm(`${t.name} silinsin mi? Geçmişi de silinecek.`)) fbRemove(`${tablesPath()}/${id}`);
+    });
+    wrap.appendChild(card);
+  });
+}
+
+function loadSetupPickFromTable(t){
+  if (t && Array.isArray(t.initialRanking) && t.initialRanking.length >= 2){
+    dicePick = { ranking: t.initialRanking.slice() };
+  } else if (t && t.rotation && t.rotation.king){
+    const king = t.rotation.king;
+    let rest = [];
+    if (Array.isArray(t.rotation.fullOrder) && t.rotation.fullOrder.length > 0){
+      rest = t.rotation.fullOrder.slice();
+    } else if (Array.isArray(t.rotation.queue)){
+      if (t.rotation.kingHelper) rest.push(t.rotation.kingHelper);
+      rest.push(...t.rotation.queue);
+      if (t.seated && t.seated.B) rest.push(t.seated.B);
+    }
+    dicePick = { ranking: [king, ...rest.filter(n=>n!==king)] };
+  } else {
+    dicePick = { ranking: [] };
+  }
+}
+
+/* ===================== SCREEN 3: TABLE SETUP (ZAR SIRASINA GÖRE) =====================
+   Kural: en büyük atan masada tek kalır (Kral). En küçük atan ilk
+   rakip olur, ondan büyük olanlar sırayla rakip olur, kalanlar ortak.
+   Kazanan hep tek kalır (Kral). Kaybeden (eski Kral veya yenilen rakip)
+   sıranın sonuna eklenir, sıra hiç bozulmadan döner durur. */
+function renderSetupScreen(){
+  const t = STATE.tables[currentTableId];
+  if (!t) return;
+  document.getElementById("setupTableName").textContent = t.name;
+  renderDiceSetupView();
+}
+
+function renderDiceSetupView(){
+  const names = getSessionPlayerNames();
+
+  const rankWrap = document.getElementById("diceRankPickWrap");
+  rankWrap.innerHTML = "";
+  names.forEach(name=>{
+    const idx = dicePick.ranking.indexOf(name);
+    const btn = document.createElement("button");
+    btn.className = "pick" + (idx>-1 ? " sel-on" : "");
+    btn.textContent = idx>-1 ? `${idx+1}. ${name}` : name;
+    btn.addEventListener("click", ()=>{
+      if (idx>-1) dicePick.ranking.splice(idx,1);
+      else dicePick.ranking.push(name);
+      renderDiceSetupView();
+    });
+    rankWrap.appendChild(btn);
+  });
+
+  const total = names.length;
+  const resultEl = document.getElementById("diceRankResult");
+  const startBtn = document.getElementById("startDiceGameBtn");
+  if (total < 2){
+    resultEl.textContent = "Oturuma en az 2 oyuncu eklemelisiniz.";
+    startBtn.disabled = true;
+  } else if (dicePick.ranking.length < total){
+    resultEl.textContent = `${dicePick.ranking.length}/${total} oyuncu sıralandı.`;
+    startBtn.disabled = true;
+  } else {
+    resultEl.textContent = `Sıra: ${dicePick.ranking.join(" → ")} (büyükten küçüğe)`;
+    startBtn.disabled = false;
+  }
+}
+
+document.getElementById("diceResetBtn").addEventListener("click", ()=>{
+  dicePick.ranking = [];
+  renderDiceSetupView();
+});
+
+/* seatFromRotation: king + kuyruktaki herkesin toplamına göre KENDİSİ
+   karar verir (useHelper parametresi YOK artık - dinamik). Toplam
+   oyuncu sayısı (king + queue.length + kingHelper varsa) 5,6,7 ise Kral'ın
+   yardımcısı olur, 4 kişide Kral hep tek kalır.
+   Bu sayede oturuma sonradan oyuncu eklenip çıkarılınca kural anında
+   güncel oyuncu sayısına göre kendini ayarlar. */
+function seatFromRotation(king, kingHelperWanted, queueFull){
+  const totalPlayers = 1 + (kingHelperWanted ? 1 : 0) + queueFull.length;
+  const useHelper = totalPlayers >= 5; // 5,6,7 kişide Kral'ın yardımcısı var
+  let kingHelper = null;
+  let queue = queueFull.slice();
+  if (useHelper){
+    // Kral'ın yardımcısı isteniyor ve mevcutsa onu kullan; yoksa
+    // kuyruktaki ikinci kişiyi (4. en büyük benzeri) yardımcı yap.
+    if (kingHelperWanted && queueFull.includes(kingHelperWanted)){
+      kingHelper = kingHelperWanted;
+      queue = queueFull.filter(n=>n!==kingHelperWanted);
+    } else if (kingHelperWanted){
+      kingHelper = kingHelperWanted;
+      // kingHelperWanted kuyrukta değilse (örn. yeni atandı), olduğu gibi kullan
+    } else if (queueFull.length >= 2){
+      // Otomatik yardımcı: kuyruktaki en büyük (sondaki) kişi - ilk
+      // kurulumda bu "4. en büyük" konumuna denk gelir.
+      kingHelper = queueFull[queueFull.length - 1];
+      queue = queueFull.slice(0, -1);
+    }
+  }
+  const challenger = queue[0];
+  const challengerHelpers = queue.slice(1);
+  const partnersA = {};
+  if (kingHelper) partnersA[kingHelper] = true;
+  const partnersB = {};
+  challengerHelpers.forEach(n=> partnersB[n] = true);
+
+  const fullOrder = [...challengerHelpers];
+  if (kingHelper) fullOrder.push(kingHelper);
+  fullOrder.push(challenger);
+
+  return {
+    rotation: { king, queue: challengerHelpers, kingHelper: kingHelper || null, fullOrder },
+    seated: { A: king, B: challenger },
+    partners: { A: partnersA, B: partnersB },
+    usesKingHelper: useHelper
+  };
+}
+/* ranking: en büyükten en küçüğe sıralanmış isim listesi. Kral = ranking[0].
+   4 KİŞİDE: Kral HEP TEK kalır, hiçbir zaman yardımcısı olmaz (kazansa
+   da kaybetse de). Rakip sırası: önce en küçük zar atan, sonra sırayla
+   "diğer büyük atanlar" - yani 2. en büyük, sonra 3. en büyük (Kral
+   hariç en büyükten en küçüğe doğru, en küçük en başta). Kaybeden
+   sıranın sonuna gider, böylece bu sıra hep aynı şekilde döner.
+   5 KİŞİDE: Kral'ın HER ZAMAN bir yardımcısı vardır (2'ye 3 oynanır).
+   İlk el: en küçük atan rakip, 4. en büyük (=2. en küçük) Kral'ın
+   yardımcısı, kalan 2 kişi rakibin ortağı. Sonraki her elde: oyunu
+   (oturarak) kaybeden, bir sonraki elde DOĞRUDAN kazananın (yeni Kral'ın)
+   yardımcısı olur; eski yardımcı sıranın sonuna gider. */
+/* ranking: en büyükten en küçüğe sıralanmış isim listesi. Kral = ranking[0].
+   4 KİŞİDE: Kral HEP TEK. Sıra: en küçük → 2.büyük → 3.büyük.
+   5 KİŞİDE: A=Kral+R4, B=R5+[R2,R3]. Kaybeden oturan → yeni yardımcı.
+   6 KİŞİDE: A=Kral+R5, B=R6+[R2,R3,R4]. Kaybeden oturan → yeni yardımcı.
+   7 KİŞİDE: A=Kral+R6, B=R7+[R2,R3,R4,R5]. Kaybeden oturan → yeni yardımcı. */
+function rotationFromRanking(ranking){
+  const n = ranking.length;
+  const king = ranking[0];
+
+  if (n === 4){
+    const nonKing = ranking.slice(1);
+    const lowest = nonKing[nonKing.length - 1];
+    const restInOrder = nonKing.slice(0, -1);
+    return seatFromRotation(king, null, [lowest].concat(restInOrder));
+  }
+
+  if (n === 5){
+    const nonKing = ranking.slice(1);
+    const lowest = nonKing[nonKing.length - 1];
+    const rest = nonKing.slice(0, -1);
+    return seatFromRotation(king, null, [lowest, ...rest]);
+  }
+
+  if (n === 6){
+    const nonKing = ranking.slice(1);
+    const lowest = nonKing[nonKing.length - 1];
+    const helper = nonKing[nonKing.length - 2];
+    const rest = nonKing.slice(0, -2);
+    return seatFromRotation(king, null, [lowest, ...rest, helper]);
+  }
+
+  if (n === 7){
+    const nonKing = ranking.slice(1);
+    const lowest = nonKing[nonKing.length - 1];
+    const helper = nonKing[nonKing.length - 2];
+    const rest = nonKing.slice(0, -2);
+    return seatFromRotation(king, null, [lowest, ...rest, helper]);
+  }
+
+  const nonKing = ranking.slice(1);
+  const lowest = nonKing[nonKing.length - 1];
+  const restInOrder = nonKing.slice(0, -1);
+  return seatFromRotation(king, null, [lowest, ...restInOrder]);
+}
+/* Bir el bittiğinde sıradaki eli (yeni Kral/yardımcı/rakip/ortaklar) hesaplar.
+   Yardımcı kuralı artık STATİK bir bayrak değil, o anki TOPLAM oyuncu
+   sayısına göre seatFromRotation içinde dinamik olarak belirlenir -
+   böylece oturuma sonradan oyuncu eklenip çıkarılınca otomatik uyum
+   sağlanır. */
+/* El bittiğinde, BİR SONRAKİ elin kimlerle oynanacağını DEĞİL, sadece
+   "sıradaki tam liste"yi (kim Kral, ondan sonra sırasıyla kim geliyor)
+   hesaplar. Gerçek seated/partners ataması ise "Yeni El Başlat"a
+   basıldığı anda (startGameForTable içinde, GÜNCEL oyuncu listesine
+   göre) yapılır - böylece arada oyuncu ekleme/çıkarma olursa otomatik
+   doğru yansır. */
+function advanceRotation(t, winnerSide){
+  const king = t.seated.A;
+  const challenger = t.seated.B;
+
+  // Ortakların SIRASI kritik — Object.keys(partners.B) Firebase'den
+  // gelirken sıra garantisi yok, bu yüzden önceki rotation.fullOrder'dan
+  // türetiyoruz: orada sıra kayıtlı ve korunuyor.
+  const rawFO = t.rotation && t.rotation.fullOrder;
+  let prevFullOrder = Array.isArray(rawFO)
+    ? rawFO.slice()
+    : (rawFO && typeof rawFO === "object")
+      ? Object.keys(rawFO).sort((a,b)=>+a-+b).map(k=>rawFO[k])
+      : null;
+
+  let kingHelper, challengerHelpers;
+  if (prevFullOrder){
+    const partnersASet = new Set(Object.keys((t.partners&&t.partners.A)||{}));
+    const partnersBSet = new Set(Object.keys((t.partners&&t.partners.B)||{}));
+    kingHelper = prevFullOrder.find(n => partnersASet.has(n)) || null;
+    challengerHelpers = prevFullOrder.filter(n => partnersBSet.has(n));
+  } else {
+    kingHelper = Object.keys((t.partners&&t.partners.A)||{})[0] || null;
+    challengerHelpers = Object.keys((t.partners&&t.partners.B)||{});
+  }
+
+  let newKing, seatedLoser;
+  if (winnerSide === "A"){
+    newKing = king;
+    seatedLoser = challenger;
+  } else {
+    newKing = challenger;
+    seatedLoser = king;
+  }
+
+  const fullOrder = [];
+  fullOrder.push(...challengerHelpers);
+  if (kingHelper) fullOrder.push(kingHelper);
+  fullOrder.push(seatedLoser);
+
+  return { king: newKing, fullOrder };
+}
+
+/* Zar sırası onaylandıktan sonra gerçek oyunu Firebase'e yazar.
+   autoVidoCount: kaç otomatik vido var (0 = normal başlangıç,
+   1 = x2, 2 = x4, 3 = x8, …) */
+/* ===================== 2'YE 2 ROTASYON =====================
+   İlk el: R1+R3 (A) vs R2+R4 (B) — en büyük+3.büyük vs 2.büyük+en küçük.
+   Kural (1'e 3 ile aynı mantık):
+   - Kazanan oturan (Kral) masada kalır, kaybeden oturan onun yeni ortağı olur.
+   - Kaybeden ortağı sıranın sonuna gider.
+   - Kuyruktan sıradaki kişi yeni oturan rakip (B) olur, onun da sıradaki
+     kuyruk arkadaşı otomatik ortak olur.
+   Her zaman 2'ye 2 formatında kalır. */
+function rotationFromRanking_2v2(ranking){
+  // ranking: [R1(en büyük), R2, R3, R4(en küçük)]
+  // İlk el: A = R1+R3, B = R4+R2
+  // fullOrder: [R1, R3, R2, R4] — R1 kral, R3 onun ortağı, sonra R2, R4
+  return {
+    seated: { A: ranking[0], B: ranking[3] },
+    partners: { A: { [ranking[2]]: true }, B: { [ranking[1]]: true } },
+    rotation: { king: ranking[0], fullOrder: [ranking[2], ranking[1], ranking[3]], format: "2v2" },
+    usesKingHelper: true,
+    format: "2v2"
+  };
+}
+
+function advanceRotation_2v2(t, winnerSide){
+  const king = t.seated.A;
+  const challenger = t.seated.B;
+  const kingHelper = Object.keys((t.partners&&t.partners.A)||{})[0] || null;
+  const challengerHelper = Object.keys((t.partners&&t.partners.B)||{})[0] || null;
+
+  let newKing, seatedLoser, loserHelper, winnerHelper;
+  if (winnerSide === "A"){
+    newKing = king;
+    winnerHelper = kingHelper;     // kazanan ortağı kalır
+    seatedLoser = challenger;       // rakip oturan yeni yardımcı olur
+    loserHelper = challengerHelper; // rakip ortağı kuyruğa gider
+  } else {
+    newKing = challenger;
+    winnerHelper = challengerHelper;
+    seatedLoser = king;
+    loserHelper = kingHelper;
+  }
+
+  // fullOrder: yeni Kral'ın ortağı (kazanan ortak), ardından kuyruktan
+  // gelecek kişi/kişiler, en sonda kaybeden (yeni Kral'ın ortağı olacak).
+  // kuyruktan gelecek yeni rakip = fullOrder'ın başındaki kişi (startGameForTable'da).
+  const fullOrder = [];
+  if (winnerHelper) fullOrder.push(winnerHelper); // kazanan ortağı (bir sonraki elde de Kral'ın ortağı)
+  if (loserHelper) fullOrder.push(loserHelper);   // kuyruktan gelecek yeni rakibin ortağı
+  fullOrder.push(seatedLoser);                     // kaybeden = yeni Kral'ın yardımcısı (EN SONDA)
+
+  return { king: newKing, fullOrder, format: "2v2" };
+}
+
+function seat2v2FromRotation(king, fullOrder){
+  // fullOrder: [kazanan ortak, rakibin ortağı, kaybeden (yeni kral yardımcısı)]
+  // Ama startGameForTable'da fullOrder [king, ...rest] şeklinde geliyor.
+  // rest = [kazananOrtak, rakipOrtağı, kaybeden]
+  // Yeni el: A = king + rest[2](kaybeden=yardımcı), B = rest[0](kuyruk=rakip) + rest[1]
+  const [kingHelper, challengerHelper, newChallenger] = fullOrder;
+  // Aslında fullOrder = [kazananOrtak, loserHelper, seatedLoser]
+  // Sıradaki rakip (B oturan) = loserHelper'dan sonra kuyruktan gelmeli
+  // Ama bizim 2v2 rotasyonumuzda:
+  // fullOrder[0] = winnerHelper (kral ortağı kalır)
+  // fullOrder[1] = loserHelper (yeni rakibin ortağı)
+  // fullOrder[2] = seatedLoser (yeni kral yardımcısı)
+  return {
+    seated: { A: king, B: fullOrder[1] },
+    partners: { A: { [fullOrder[2]]: true }, B: { [fullOrder[0]]: true } }
+  };
+}
+
+let pendingFormat = null; // "1v3" veya "2v2"
+
+function openFormatModal(onSelect){
+  document.getElementById("formatModalOverlay").style.display = "flex";
+  document.getElementById("format1v3Btn").onclick = ()=>{
+    document.getElementById("formatModalOverlay").style.display = "none";
+    onSelect("1v3");
+  };
+  document.getElementById("format2v2Btn").onclick = ()=>{
+    document.getElementById("formatModalOverlay").style.display = "none";
+    onSelect("2v2");
+  };
+}
+
+function launchDiceGame(autoVidoCount){
+  if (dicePick.ranking.length < 2) return;
+  const fmt = pendingFormat || "1v3";
+  const setup = fmt === "2v2"
+    ? rotationFromRanking_2v2(dicePick.ranking)
+    : rotationFromRanking(dicePick.ranking);
+  const game = buildInitialGame(setup.seated, setup.partners);
+  if (autoVidoCount > 0){
+    Object.values(game.pairs).forEach(oppMap=>{
+      Object.values(oppMap).forEach(p=>{ p.count = autoVidoCount; });
+    });
+  }
+  fbUpdate(`${tablesPath()}/${currentTableId}`, {
+    seated: setup.seated,
+    partners: setup.partners,
+    rotation: setup.rotation,
+    usesRotation: true,
+    usesKingHelper: setup.usesKingHelper,
+    format: fmt,
+    initialRanking: dicePick.ranking.slice(),
+    autoVidoNextHand: false,
+    handsSinceReset: 1,
+    game
+  });
+  goScreen("s4", currentTableId);
+}
+
+document.getElementById("startDiceGameBtn").addEventListener("click", ()=>{
+  if (dicePick.ranking.length < 2){
+    alert("Lütfen önce tüm oyuncuları sıralayın.");
+    return;
+  }
+  if (dicePick.ranking.length === 4){
+    openFormatModal((fmt)=>{
+      pendingFormat = fmt;
+      launchDiceGame(0);
+    });
+  } else {
+    pendingFormat = "1v3";
+    launchDiceGame(0);
+  }
+});
+
+function startGameForTable(id, autoVidoCount){
+  autoVidoCount = autoVidoCount || 0;
+  const t = STATE.tables[id];
+  if (!t || !t.seated || !t.seated.A || !t.seated.B){
+    alert("Önce A ve B taraflarına oyuncu atayın.");
+    return;
+  }
+
+  let seated = t.seated;
+  let partners = t.partners;
+
+  if (t.usesRotation && t.rotation){
+    // rotation.fullOrder: bir önceki elin sonunda hesaplanan "kim Kral,
+    // sırasıyla kim geliyor" listesi. Bu liste, GÜNCEL oturum oyuncu
+    // listesiyle kesiştirilir (yani aradan çıkarılan biri varsa elenir;
+    // eklenen biri rotation.fullOrder'a zaten ek butonunda işlenmiştir).
+    // Böylece "Yeni El Başlat" anında oyuncu sayısı ne ise (4 veya 5),
+    // Kral/yardımcı kuralı ona göre doğru kurulur.
+    const sessionNames = new Set(getSessionPlayerNames());
+    let fullOrder;
+
+    const rawFull = t.rotation.fullOrder;
+    const parsedFull = Array.isArray(rawFull)
+      ? rawFull
+      : (rawFull && typeof rawFull === "object")
+        ? Object.keys(rawFull).sort((a,b)=>+a-+b).map(k=>rawFull[k])
+        : null;
+
+    if (parsedFull && parsedFull.length > 0){
+      fullOrder = [t.rotation.king, ...parsedFull.filter(n=>n!==t.rotation.king)]
+        .filter(n=>sessionNames.has(n));
+    } else if (Array.isArray(t.rotation.queue)){
+      fullOrder = [t.rotation.king];
+      if (t.rotation.kingHelper) fullOrder.push(t.rotation.kingHelper);
+      fullOrder.push(...t.rotation.queue);
+      fullOrder = fullOrder.filter(n=>sessionNames.has(n));
+    } else {
+      fullOrder = [t.seated.A, t.seated.B].filter(n=>sessionNames.has(n));
+    }
+
+    if (fullOrder.length < 2){
+      alert("Bu masada oynamaya devam edecek yeterli oyuncu kalmadı (en az 2 kişi gerekli).");
+      return;
+    }
+
+    const king = fullOrder[0];
+    const queueFull = fullOrder.slice(1);
+
+    let setup;
+    if ((t.format || t.rotation.format) === "2v2"){
+      // 2'ye 2 formatı: fullOrder = [king, yardımcı, rakipOrtağı, rakip]
+      // seat2v2FromRotation bunu 2x2 oturumuna dönüştürür.
+      setup = seat2v2FromRotation(king, queueFull);
+      seated = setup.seated;
+      partners = setup.partners;
+      fbUpdate(`${tablesPath()}/${id}`, {
+        seated: setup.seated,
+        partners: setup.partners,
+        rotation: { king, fullOrder: queueFull, format: "2v2" }
+      });
+    } else {
+      setup = seatFromRotation(king, null, queueFull);
+      seated = setup.seated;
+      partners = setup.partners;
+      fbUpdate(`${tablesPath()}/${id}`, {
+        seated: setup.seated,
+        partners: setup.partners,
+        rotation: setup.rotation
+      });
+    }
+  }
+
+  const game = buildInitialGame(seated, partners);
+  const isAutoVidoHand = autoVidoCount > 0;
+  if (isAutoVidoHand){
+    Object.values(game.pairs).forEach(oppMap=>{
+      Object.values(oppMap).forEach(p=>{ p.count = autoVidoCount; });
+    });
+  }
+  const newHandsSinceReset = isAutoVidoHand ? 0 : (t.handsSinceReset !== undefined ? t.handsSinceReset : 1);
+  fbUpdate(`${tablesPath()}/${id}`, { game, autoVidoNextHand: false, handsSinceReset: newHandsSinceReset });
+  goScreen("s4", id);
+}
+
+document.getElementById("editSeatsBtn").addEventListener("click", ()=>{
+  const t = STATE.tables[currentTableId];
+  if (t) loadSetupPickFromTable(t);
+  goScreen("s3", currentTableId);
+});
+
+/* ===================== SCREEN 4: GAME ===================== */
+function renderGameScreen(){
+  const t = STATE.tables[currentTableId];
+  if (!t || !t.game) { goScreen("s2"); return; }
+  const g = t.game;
+  document.getElementById("gameTableName").textContent = t.name;
+
+  const unit = STATE.settings.unitAmount || 0;
+  const unitNote = document.getElementById("unitNote");
+  if (unit > 0){
+    unitNote.textContent = `Birim: ${unit} ₺`;
+    unitNote.classList.remove("warn");
+  } else {
+    unitNote.textContent = `Birim tutar 0 ₺! Oyuncular sekmesinden girin, yoksa tutarlar 0 çıkar.`;
+    unitNote.classList.add("warn");
+  }
+
+  if (t.usesRotation && t.rotation && t.rotation.king){
+    const rawFO = t.rotation.fullOrder;
+    const fo = Array.isArray(rawFO) ? rawFO
+      : (rawFO && typeof rawFO === 'object')
+        ? Object.keys(rawFO).sort((a,b)=>+a-+b).map(k=>rawFO[k])
+        : [];
+    const challenger = fo[fo.length - 1];
+    const rest = fo.slice(0, -1).filter(n => n !== challenger);
+    const nextPlayers = challenger ? [challenger, ...rest] : rest;
+    if (nextPlayers.length > 0){
+      document.getElementById("rotationNote").style.display = "block";
+      document.getElementById("rotationNote").textContent =
+        `Sıradaki oyuncular: ${nextPlayers.join(" · ")}`;
+    } else {
+      document.getElementById("rotationNote").style.display = "none";
+    }
+  } else {
+    document.getElementById("rotationNote").style.display = "none";
+  }
+
+  renderSideBox("A", t);
+  renderSideBox("B", t);
+
+  const finished = !!g.finished;
+  document.getElementById("liveControls").style.display = finished ? "none" : "block";
+  document.getElementById("finishedPanel").style.display = finished ? "block" : "none";
+
+  // Otomatik vido bandı: el canlıyken ve pairs'te count>0 ise göster
+  const isAutoVidoEl = !finished && t.handsSinceReset === 0;
+  document.getElementById("autoVidoBand").style.display = isAutoVidoEl ? "block" : "none";
+
+  if (!finished && t.seated){
+    const nameA = t.seated.A || "A";
+    const nameB = t.seated.B || "B";
+    document.getElementById("aWinsBtn").textContent = nameA + " Kazandı";
+    document.getElementById("bWinsBtn").textContent = nameB + " Kazandı";
+    document.getElementById("aMarsBtn").textContent = "⭐ " + nameA + " Mars";
+    document.getElementById("bMarsBtn").textContent = "⭐ " + nameB + " Mars";
+  }
+
+  if (finished) renderFinishedResults(t);
+
+  const logWrap = document.getElementById("vidoLogWrap");
+  const logCard = document.getElementById("vidoLogCard");
+  if (g.vidoLog && g.vidoLog.length){
+    logCard.style.display = "block";
+    logWrap.innerHTML = g.vidoLog.map(v=>{
+      const txt = v.saw
+        ? `gördü (x${Math.pow(2,v.from)} → x${Math.pow(2,v.from+1)})`
+        : `görmedi — x${Math.pow(2,v.from)} üzerinden kapandı`;
+      return `<div class="vido-log-row">${escapeHtml(v.caller)} → ${escapeHtml(v.opponent)}: ${txt}</div>`;
+    }).join("");
+  } else {
+    logCard.style.display = "none";
+  }
+}
+
+function renderSideBox(side, t){
+  const g = t.game;
+  const otherSide = side === "A" ? "B" : "A";
+  const names = sideNames(t, side);
+  const oppNames = sideNames(t, otherSide);
+  const box = document.getElementById(`side${side}Box`);
+  let html = `<div class="s-title">${side} TARAFI</div>`;
+  names.forEach(name=>{
+    const isSeated = name === t.seated[side];
+    const tagHtml = isSeated
+      ? `<span class="ptag ptag-seated">OTURAN</span>`
+      : `<span class="ptag">Ortak</span>`;
+    html += `<div class="person-block"><div class="p-row"><span class="pname">${escapeHtml(name)}</span>${tagHtml}</div>`;
+    oppNames.forEach(opp=>{
+      const { p } = getPairCell(t, name, opp);
+      if (!p) return;
+      const pill = p.closed
+        ? `<span class="status-pill locked">KAPANDI x${Math.pow(2,p.closedAtCount)}</span>`
+        : `<span class="status-pill active">x${Math.pow(2,p.count)}</span>`;
+      html += `<div class="opp-row"><span class="opp-name">↔ ${escapeHtml(opp)}</span>${pill}</div>`;
+    });
+    html += `</div>`;
+  });
+  box.innerHTML = html;
+}
+
+/* Vido çekme - artık tek kişi yerine birden fazla "çeken" seçilebilir
+   (genelde ortaklar birlikte çeker), ardından bu çekenlerin tüm geçerli
+   rakiplerinin birleşimi "görenler" listesi olarak çıkar. Varsayılan
+   olarak herkes "görmüş" sayılır, görmeyen tek tek çıkarılır. */
+document.getElementById("vidoCalledBtn").addEventListener("click", ()=>{
+  selectedVidoCallers = [];
+  selectedVidoSeers = {};
+  goScreen("s5");
+});
+
+function renderVidoCallersAndSeers(){
+  const t = STATE.tables[currentTableId];
+  if (!t || !t.game) return;
+  const g = t.game;
+
+  const callersWrap = document.getElementById("vidoCallersWrap");
+  callersWrap.innerHTML = "";
+  ["A","B"].forEach(side=>{
+    sideNames(t, side).forEach(name=>{
+      const targets = callableTargets(t, name);
+      if (targets.length === 0) return; // çekemiyorsa listede bile gösterme
+      const btn = document.createElement("button");
+      const isSel = selectedVidoCallers.includes(name);
+      btn.className = "pick " + (side==="A" ? "sel-a" : "sel-b") + (isSel ? "" : " not-selected-caller");
+      if (!isSel) btn.style.opacity = ".45";
+      btn.textContent = `🎲 ${name}`;
+      btn.addEventListener("click", ()=>{
+        const idx = selectedVidoCallers.indexOf(name);
+        if (idx>-1) selectedVidoCallers.splice(idx,1);
+        else selectedVidoCallers.push(name);
+        renderVidoCallersAndSeers();
+      });
+      callersWrap.appendChild(btn);
+    });
+  });
+
+  const seersCard = document.getElementById("vidoSeersCard");
+  const seersWrap = document.getElementById("vidoSeersWrap");
+  const confirmBtn = document.getElementById("confirmVidoBtn");
+
+  if (!selectedVidoCallers.length){
+    seersCard.style.display = "none";
+    confirmBtn.disabled = true;
+    return;
+  }
+
+  // Seçilen tüm çekenlerin geçerli rakiplerinin birleşimi.
+  const targetMap = {}; // isim -> [{caller, value}]
+  selectedVidoCallers.forEach(caller=>{
+    callableTargets(t, caller).forEach(target=>{
+      const { p } = getPairCell(t, caller, target);
+      if (!targetMap[target]) targetMap[target] = [];
+      targetMap[target].push({ caller, value: Math.pow(2, p.count) });
+      if (!(target in selectedVidoSeers)) selectedVidoSeers[target] = true; // varsayılan: gördü
+    });
+  });
+
+  const targetNames = Object.keys(targetMap);
+  if (!targetNames.length){
+    seersCard.style.display = "block";
+    seersWrap.innerHTML = `<div class="small-note">Seçilen oyuncuların şu an çekebileceği bir rakip yok.</div>`;
+    confirmBtn.disabled = true;
+    return;
+  }
+
+  seersCard.style.display = "block";
+  confirmBtn.disabled = false;
+  seersWrap.innerHTML = "";
+  targetNames.forEach(target=>{
+    const seen = !!selectedVidoSeers[target];
+    const breakdown = targetMap[target].map(x=>`${dativeName(x.caller)} karşı x${x.value}`).join(" · ");
+    const row = document.createElement("div");
+    row.className = "seer-row " + (seen ? "seen" : "not-seen");
+    row.innerHTML = `
+      <div><div class="seer-name">${escapeHtml(target)}</div><div class="seer-breakdown">${escapeHtml(breakdown)}</div></div>
+      <span class="seer-status">${seen ? "GÖRDÜ" : "GÖRMEDİ"}</span>
+    `;
+    row.addEventListener("click", ()=>{
+      selectedVidoSeers[target] = !selectedVidoSeers[target];
+      renderVidoCallersAndSeers();
+    });
+    seersWrap.appendChild(row);
+  });
+}
+
+document.getElementById("confirmVidoBtn").addEventListener("click", ()=>{
+  try{
+    const t = STATE.tables[currentTableId];
+    const g = t.game;
+    g.vidoLog = g.vidoLog || [];
+
+    selectedVidoCallers.forEach(caller=>{
+      callableTargets(t, caller).forEach(targetName=>{
+        const { p } = getPairCell(t, caller, targetName);
+        const oldCount = p.count;
+        const saw = !!selectedVidoSeers[targetName];
+        if (saw){
+          p.count = oldCount + 1;
+          p.blockedCaller = caller;
+        } else {
+          p.closed = true;
+          p.closedLoser = targetName;
+          p.closedAtCount = oldCount;
+        }
+        g.vidoLog.push({ caller, opponent: targetName, from: oldCount, saw });
+      });
+    });
+
+    // El, sadece masadaki HERKES karşı tarafla kapandığında biter.
+    // Tek bir ikilinin (örn. oturan-oturan) kapanması yetmez; başka
+    // açık hesap varsa oturan onlar adına oynamaya devam eder.
+    let handJustFinished = false;
+    let finishWinnerSide = null;
+    if (!anyOpenPairsRemain(t)){
+      handJustFinished = true;
+      const seatedPair = t.game.pairs[t.seated.A][t.seated.B];
+      finishWinnerSide = (seatedPair && seatedPair.closedLoser === t.seated.A) ? "B" : "A";
+    }
+
+    if (handJustFinished){
+      finishHand(currentTableId, finishWinnerSide, g);
+    } else {
+      fbSet(`${tablesPath()}/${currentTableId}/game`, g);
+    }
+    goScreen("s4");
+  } catch(e){
+    console.error(e);
+    alert("Vido kaydedilirken bir hata oluştu: " + e.message);
+  }
+});
+
+document.getElementById("aWinsBtn").addEventListener("click", ()=>{
+  try{
+    const t = STATE.tables[currentTableId];
+    if (!t || !t.game){ alert("Oyun verisi henüz yüklenmedi, lütfen tekrar deneyin."); return; }
+    finishHand(currentTableId, "A", t.game, false);
+  } catch(e){
+    console.error(e);
+    alert("El kapatılırken bir hata oluştu: " + e.message);
+  }
+});
+document.getElementById("bWinsBtn").addEventListener("click", ()=>{
+  try{
+    const t = STATE.tables[currentTableId];
+    if (!t || !t.game){ alert("Oyun verisi henüz yüklenmedi, lütfen tekrar deneyin."); return; }
+    finishHand(currentTableId, "B", t.game, false);
+  } catch(e){
+    console.error(e);
+    alert("El kapatılırken bir hata oluştu: " + e.message);
+  }
+});
+document.getElementById("aMarsBtn").addEventListener("click", ()=>{
+  try{
+    const t = STATE.tables[currentTableId];
+    if (!t || !t.game){ alert("Oyun verisi henüz yüklenmedi, lütfen tekrar deneyin."); return; }
+    finishHand(currentTableId, "A", t.game, true);
+  } catch(e){
+    console.error(e);
+    alert("El kapatılırken bir hata oluştu: " + e.message);
+  }
+});
+document.getElementById("bMarsBtn").addEventListener("click", ()=>{
+  try{
+    const t = STATE.tables[currentTableId];
+    if (!t || !t.game){ alert("Oyun verisi henüz yüklenmedi, lütfen tekrar deneyin."); return; }
+    finishHand(currentTableId, "B", t.game, true);
+  } catch(e){
+    console.error(e);
+    alert("El kapatılırken bir hata oluştu: " + e.message);
+  }
+});
+
+/* ===================== EL SONUCU HESAPLAMA =====================
+   Her ikili kendi son durumuna göre kapatılır:
+   - Daha önce biri "görmedi" deyip kapanmışsa: o sabit değerle kaybeder.
+   - Hâlâ açıksa: el kazananına göre, o ikilinin GÜNCEL puanıyla kapanır. */
+function finishHand(tableId, winnerSide, g, isMars){
+  const t = STATE.tables[tableId];
+  if (!t || !t.seated || !t.seated.A || !t.seated.B){
+    throw new Error("Masa verisi eksik (oturanlar bulunamadı).");
+  }
+  const unit = STATE.settings.unitAmount || 0;
+  const results = {};
+  function ensure(n){ if(!results[n]) results[n] = { vs:{}, total:0 }; }
+  function addSettle(loser, winner, amount){
+    ensure(loser); ensure(winner);
+    results[loser].vs[winner] = (results[loser].vs[winner]||0) - amount;
+    results[loser].total -= amount;
+    results[winner].vs[loser] = (results[winner].vs[loser]||0) + amount;
+    results[winner].total += amount;
+  }
+  // Mars çarpanı: sadece oyun sonuna kadar açık kalan (hiç "Görmedi"
+  // demeyen) çiftlere uygulanır. "Görmedi" deyip kapanan çiftler
+  // (p.closed === true) mars'tan etkilenmez — kendi kapanma anındaki
+  // değerleri sabittir.
+  const marsMultiplier = isMars ? 2 : 1;
+
+  Object.entries(g.pairs).forEach(([aName, oppMap])=>{
+    Object.entries(oppMap).forEach(([bName, p])=>{
+      if (p.closed){
+        const loser = p.closedLoser;
+        const winner = loser === aName ? bName : aName;
+        addSettle(loser, winner, Math.pow(2, p.closedAtCount) * unit);
+      } else {
+        const winner = winnerSide === "A" ? aName : bName;
+        const loser = winnerSide === "A" ? bName : aName;
+        addSettle(loser, winner, Math.pow(2, p.count) * unit * marsMultiplier);
+      }
+    });
+  });
+
+  // Bu el sırasında oturumdan çıkarılıp hesabı önceden sabitlenmiş
+  // oyuncular varsa (settlePlayerOutOfLiveHand), onları da nihai
+  // sonuçlara dahil et.
+  (g.settledOut||[]).forEach(({loser, winner, amount})=>{
+    addSettle(loser, winner, amount);
+  });
+
+  // Geri alma için: el bitmeden önceki game durumunu sakla
+  const gameBeforeFinish = JSON.parse(JSON.stringify(g));
+
+  g.finished = true;
+  g.winner = winnerSide;
+  g.mars = !!isMars;
+  g.results = results;
+
+  const gameNo = Object.keys(t.history||{}).length + 1;
+  const historyRef = fbPush(`${tablesPath()}/${tableId}/history`, {
+    gameNo, winner: winnerSide, mars: !!isMars, autoVido: (t.handsSinceReset === 0),
+    winnerSeated: winnerSide === "A" ? t.seated.A : t.seated.B,
+    sideA: Object.keys({[t.seated.A]:true, ...(t.partners.A||{})}),
+    sideB: Object.keys({[t.seated.B]:true, ...(t.partners.B||{})}),
+    results, time: Date.now()
+  });
+
+  const previousSnapshot = {
+    gameJson: JSON.stringify(gameBeforeFinish), // string olarak sakla - Firebase nested sorununu önler
+    seated: t.seated ? JSON.parse(JSON.stringify(t.seated)) : null,
+    partners: t.partners ? JSON.parse(JSON.stringify(t.partners)) : null,
+    rotation: t.rotation ? JSON.parse(JSON.stringify(t.rotation)) : null,
+    handsSinceReset: t.handsSinceReset,
+    autoVidoNextHand: !!t.autoVidoNextHand,
+    historyKey: historyRef ? historyRef.key : null,
+  };
+
+  // Otomatik vido tetikleyici: mars veya oturan biri "Görmedi" demiş mi?
+  const seatedNames = new Set([t.seated.A, t.seated.B]);
+  let seatedPlayerGormedí = false;
+  Object.entries(g.pairs||{}).forEach(([aName, oppMap])=>{
+    Object.entries(oppMap||{}).forEach(([bName, p])=>{
+      if (p.closed && seatedNames.has(p.closedLoser)){
+        seatedPlayerGormedí = true;
+      }
+    });
+  });
+  // Sayaç mantığı: her el bittikçe +1. 3'e ulaşınca → bir sonraki el otomatik vido,
+  // sayaç sıfırlanır. Mars/Görmedi de bağımsız olarak bir sonraki eli tetikler
+  // ve sayaç sıfırlanır.
+  const prevCount = t.handsSinceReset !== undefined ? t.handsSinceReset : 0;
+  // Bu el otomatik vidolu muydu?
+  // startGameForTable otomatik vido elinde handsSinceReset=0 yazar,
+  // normal elde değiştirmez. Bu en güvenilir işaret.
+  const wasAutoVidoEl = (t.handsSinceReset === 0);
+  const marsOrGormedi = wasAutoVidoEl && !!(isMars || seatedPlayerGormedí);
+  let handsSinceReset, autoVidoNextHand;
+  if (marsOrGormedi){
+    autoVidoNextHand = true;
+    handsSinceReset = 0; // sıfırdan yeniden say
+  } else if (prevCount + 1 >= 3){
+    autoVidoNextHand = true; // 3. el tamamlandı, sonraki otomatik vido
+    handsSinceReset = 0;
+  } else {
+    autoVidoNextHand = false;
+    handsSinceReset = prevCount + 1;
+  }
+
+  let newRotation = null;
+  if (t.usesRotation){
+    const next = t.format === "2v2"
+      ? advanceRotation_2v2(t, winnerSide)
+      : advanceRotation(t, winnerSide);
+    newRotation = next;
+    fbUpdate(`${tablesPath()}/${tableId}`, {
+      game: g,
+      previousSnapshot,
+      autoVidoNextHand,
+      handsSinceReset,
+      rotation: { king: next.king, fullOrder: next.fullOrder, format: t.format || "1v3" }
+    });
+  } else {
+    fbUpdate(`${tablesPath()}/${tableId}`, { game: g, previousSnapshot, autoVidoNextHand, handsSinceReset });
+  }
+  return newRotation;
+}
+
+function renderFinishedResults(t){
+  const g = t.game;
+  const wrap = document.getElementById("finishedResults");
+  wrap.innerHTML = Object.entries(g.results||{}).map(([name,r])=>{
+    const total = r.total !== undefined ? r.total : 0;
+    const cls = total >= 0 ? "pos" : "neg";
+    const sign = total >= 0 ? "+" : "";
+    const vsTxt = r.vs ? Object.entries(r.vs).map(([opp,amt])=>`${opp} ${amt>=0?'+':''}${amt.toFixed(0)}`).join(" · ") : "";
+    return `<div class="result-line">
+        <div><span class="pname">${escapeHtml(name)}</span>${vsTxt?`<div class="vs-breakdown">${escapeHtml(vsTxt)}</div>`:''}</div>
+        <span class="amt ${cls}">${sign}${total.toFixed(2)} ₺</span>
+      </div>`;
+  }).join("");
+}
+
+document.getElementById("nextHandBtn").addEventListener("click", ()=>{
+  try{
+    const t = STATE.tables[currentTableId];
+    const autoVidoCount = (t && shouldAutoVido(t)) ? 1 : 0;
+    if (autoVidoCount > 0){
+      document.getElementById("autoVidoModal").style.display = "flex";
+      document.getElementById("autoVidoModalOk").onclick = ()=>{
+        document.getElementById("autoVidoModal").style.display = "none";
+        try{ startGameForTable(currentTableId, autoVidoCount); }
+        catch(e){ console.error(e); alert("Yeni el başlatılırken bir hata oluştu: " + e.message); }
+      };
+    } else {
+      startGameForTable(currentTableId, 0);
+    }
+  } catch(e){
+    console.error(e);
+    alert("Yeni el başlatılırken bir hata oluştu: " + e.message);
+  }
+});
+
+document.getElementById("undoHandBtn").addEventListener("click", ()=>{
+  const t = STATE.tables[currentTableId];
+  if (!t || !t.previousSnapshot) { alert("Geri alınacak bir el yok."); return; }
+  if (!confirm("Bu el iptal edilip bir önceki elin bitirilmemiş haline dönülsün mü?")) return;
+  const snap = t.previousSnapshot;
+  const sid = STATE.activeSessionId;
+  if (snap.historyKey){
+    fbRemove(`sessions/${sid}/tables/${currentTableId}/history/${snap.historyKey}`);
+  }
+  // game'i fbSet ile yaz (fbUpdate merge yapar, finished:true kalabilir)
+  const gameToRestore = snap.gameJson ? JSON.parse(snap.gameJson) : snap.game;
+  fbSet(`${tablesPath()}/${currentTableId}/game`, gameToRestore);
+  fbUpdate(`${tablesPath()}/${currentTableId}`, {
+    seated: snap.seated || t.seated,
+    partners: snap.partners || t.partners,
+    rotation: snap.rotation || t.rotation,
+    handsSinceReset: snap.handsSinceReset !== undefined ? snap.handsSinceReset : 1,
+    autoVidoNextHand: !!snap.autoVidoNextHand,
+    previousSnapshot: null,
+  });
+});
+
+/* ===================== SCREEN 6: TOTALS ===================== */
+document.getElementById("totalsSessionSelect").addEventListener("change", e=>{
+  totalsSelectedSession = e.target.value;
+  renderTotalsScreen();
+});
+
+document.getElementById("deleteTotalsSessionBtn").addEventListener("click", ()=>{
+  if (totalsSelectedSession === "ALL") return;
+  const s = STATE.sessions[totalsSelectedSession];
+  if (!s) return;
+  askPassword("Oturumu silme", ()=>{
+    if (confirm(`"${s.name}" oturumu ve içindeki tüm masalar/geçmiş tamamen silinsin mi? Bu işlem geri alınamaz.`)){
+      const wasActive = STATE.activeSessionId === totalsSelectedSession;
+      fbRemove(`sessions/${totalsSelectedSession}`);
+      if (wasActive) fbSet("activeSessionId", null);
+      totalsSelectedSession = "ALL";
+    }
+  });
+});
+
+document.getElementById("shareWhatsappTotalsBtn").addEventListener("click", ()=>{
+  if (!lastTotalsShareData) return;
+  const { title, totals, payments } = lastTotalsShareData;
+  shareBalanceCard(title, totals, payments);
+});
+
+function renderTotalsScreen(){
+  if (totalsSelectedSession === null){
+    totalsSelectedSession = STATE.activeSessionId || "ALL";
+  }
+  const sel = document.getElementById("totalsSessionSelect");
+  const sessionEntries = Object.entries(STATE.sessions||{}).sort((a,b)=> (b[1].createdAt||0)-(a[1].createdAt||0));
+  sel.innerHTML = `<option value="ALL">Tüm Oturumlar</option>` +
+    sessionEntries.map(([id,s])=>`<option value="${id}">${escapeHtml(s.name||id)}</option>`).join("");
+  if ([...sel.options].some(o=>o.value===totalsSelectedSession)) sel.value = totalsSelectedSession;
+  else { totalsSelectedSession = "ALL"; sel.value = "ALL"; }
+  document.getElementById("deleteTotalsSessionBtn").style.display = totalsSelectedSession === "ALL" ? "none" : "block";
+
+  let rows = [];
+  function collectFromSession(sid, s){
+    Object.entries(s.tables||{}).forEach(([tid,t])=>{
+      Object.entries(t.history||{}).forEach(([hid,h])=>{
+        rows.push({sessionId: sid, tableId: tid, historyId: hid, tname: t.name, ...h});
+      });
+    });
+  }
+  if (totalsSelectedSession === "ALL"){
+    sessionEntries.forEach(([id,s])=> collectFromSession(id, s));
+  } else {
+    const s = STATE.sessions[totalsSelectedSession];
+    if (s) collectFromSession(totalsSelectedSession, s);
+  }
+
+  const totals = {};
+  rows.forEach(h=>{
+    Object.entries(h.results||{}).forEach(([name,r])=>{
+      const val = (r && typeof r === "object") ? (r.total||0) : (r||0);
+      totals[name] = (totals[name]||0) + val;
+    });
+  });
+
+  const scopeNote = document.getElementById("totalsScopeNote");
+  const paymentsCard = document.getElementById("paymentsCard");
+  const paymentsListView = document.getElementById("paymentsListView");
+
+  if (totalsSelectedSession === "ALL"){
+    Object.entries(STATE.startingBalances||{}).forEach(([name,amt])=>{
+      totals[name] = (totals[name]||0) + (amt||0);
+    });
+    let anyPayments = false;
+    sessionEntries.forEach(([id,s])=>{
+      if (s.closed && s.payments && s.payments.length){
+        applyPaymentsToTotals(totals, s.payments);
+        anyPayments = true;
+      }
+    });
+    scopeNote.textContent = "Başlangıç bakiyeleri ve kapanmış oturumların ödemeleri dahil edilmiştir.";
+    paymentsCard.style.display = "none";
+  } else {
+    const s = STATE.sessions[totalsSelectedSession];
+    if (s && s.closed){
+      scopeNote.textContent = `Bu oturum kapatılmış (${new Date(s.closedAt||0).toLocaleDateString("tr-TR")}). Aşağıdaki tutar, yapılan ödemeler sonrası kalan bakiyedir.`;
+      applyPaymentsToTotals(totals, s.payments);
+      if (s.payments && s.payments.length){
+        paymentsCard.style.display = "block";
+        paymentsListView.innerHTML = s.payments.map(p=>
+          `<div class="result-line"><span>${escapeHtml(p.from)} → ${escapeHtml(p.to)}</span><span class="amt pos">${p.amount.toFixed(2)} ₺</span></div>`
+        ).join("");
+      } else {
+        paymentsCard.style.display = "none";
+      }
+    } else {
+      scopeNote.textContent = "Bu oturumun el sonuçlarına göre hesaplanan toplam (başlangıç bakiyesi dahil değildir).";
+      paymentsCard.style.display = "none";
+    }
+  }
+
+  const gw = document.getElementById("grandTotalsWrap");
+  const sorted = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
+  gw.innerHTML = sorted.length ? sorted.map(([name,amt])=>{
+    const cls = amt>=0?"pos":"neg";
+    const sign = amt>=0?"+":"";
+    return `<div class="total-row"><span class="nm">${escapeHtml(name)}</span><span class="amt ${cls}">${sign}${amt.toFixed(2)} ₺</span></div>`;
+  }).join("") : `<div class="small-note">Henüz tamamlanmış el yok.</div>`;
+
+  // WhatsApp'ta Paylaş butonu için şu an ekranda gösterilen veriyi sakla.
+  lastTotalsShareData = {
+    title: totalsSelectedSession === "ALL" ? "Tüm Oturumlar" : (STATE.sessions[totalsSelectedSession]?.name || ""),
+    totals: Object.assign({}, totals),
+    payments: totalsSelectedSession !== "ALL" && STATE.sessions[totalsSelectedSession]
+      ? (STATE.sessions[totalsSelectedSession].payments || [])
+      : null
+  };
+
+  const hw = document.getElementById("allHistoryWrap");
+  rows.sort((a,b)=>(b.time||0)-(a.time||0));
+  hw.innerHTML = "";
+  if (!rows.length){
+    hw.innerHTML = `<div class="small-note">Henüz tamamlanmış el yok.</div>`;
+  } else {
+    rows.forEach(h=>{
+      const results = h.results || {};
+      const winningSide = new Set(Array.isArray(h.sideA) ? (h.winner==="A" ? h.sideA : h.sideB) : []);
+      // Kazanan ismi: winnerSeated varsa kullan, yoksa results'tan en yüksek pozitifi bul
+      let winnerName = h.winnerSeated;
+      if (!winnerName || winnerName === "A" || winnerName === "B"){
+        const pos = Object.entries(h.results||{})
+          .map(([n,r])=>({ n, v:(r&&typeof r==="object")?(r.total||0):(r||0) }))
+          .filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
+        winnerName = pos.length ? pos[0].n : (h.winner||"?");
+      }
+      const winEntries = [], loseEntries = [];
+      Object.entries(results).forEach(([n,r])=>{
+        const val = (r && typeof r === "object") ? (r.total||0) : (r||0);
+        const isWinner = winningSide.size > 0 ? winningSide.has(n) : val >= 0;
+        const str = `<span style="color:${isWinner?'var(--green-dark,#2a7a4b)':'#c0392b'};">${escapeHtml(n)} ${val>=0?'+':''}${val.toFixed(0)}</span>`;
+        if (isWinner) winEntries.push(str); else loseEntries.push(str);
+      });
+      const resStr = [...winEntries, ...loseEntries].join(' · ');
+      const div = document.createElement("div");
+      div.className = "history-item";
+      div.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+          <div>
+            <b>${escapeHtml(h.tname)}</b> · El ${h.gameNo} · <b>${escapeHtml(winnerName)}</b> kazandı${h.mars ? ' <span style="color:var(--gold-dark);font-weight:800;">⭐ MARS</span>' : ''}${h.autoVido ? ' <span style="color:var(--gold-dark);">🎲 x2</span>' : ''}
+            <br><span class="small-note">${resStr}</span>
+          </div>
+          <button class="btn-danger btn-sm" style="flex:0 0 auto;">Sil</button>
+        </div>`;
+      div.querySelector("button").addEventListener("click", ()=>{
+        if (confirm("Bu el silinsin mi? Toplamlardan da çıkarılacak.")){
+          fbRemove(`sessions/${h.sessionId}/tables/${h.tableId}/history/${h.historyId}`);
+        }
+      });
+      hw.appendChild(div);
+    });
+  }
+
+  // Ödeme Yap bölümü — ekranda gösterilen toplam bakiyeyi geçir
+  renderPaymentInTotals(totals);
+}
+
+function renderPaymentInTotals(baseTotals){
+  // baseTotals: ekranda gösterilen toplam (renderTotalsScreen'den geliyor)
+  // yoksa activeSession'dan hesapla (fallback)
+  let totals = baseTotals;
+  if (!totals){
+    const sid = STATE.activeSessionId;
+    const s = STATE.sessions[sid];
+    if (!s) return;
+    totals = computeSessionHandTotals(s);
+  }
+  const remaining = applyPaymentsToTotals(Object.assign({}, totals), pendingPayments);
+
+  // Eksi bakiyeli = ödeyecek, artı bakiyeli = alacak
+  const debtors   = Object.entries(remaining).filter(([,v])=>v<0).map(([n])=>n);
+  const creditors = Object.entries(remaining).filter(([,v])=>v>0).map(([n])=>n);
+  // Fallback: totals'taki tüm isimler (boşsa aktif oturum oyuncuları)
+  let allNames = Object.keys(totals||{});
+  if (!allNames.length){
+    const s = STATE.sessions[STATE.activeSessionId];
+    allNames = s ? Object.keys(s.activePlayers||{}) : [];
+  }
+
+  const fromSel = document.getElementById("paymentFromSelect2");
+  const toSel   = document.getElementById("paymentToSelect2");
+  const fromNames = debtors.length ? debtors : allNames;
+  const toNames   = creditors.length ? creditors : allNames;
+  const fromHtml = fromNames.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+  const toHtml   = toNames.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+  if (fromSel.innerHTML !== fromHtml) fromSel.innerHTML = fromHtml;
+  if (toSel.innerHTML !== toHtml)     toSel.innerHTML = toHtml;
+
+  const listWrap = document.getElementById("paymentListWrap2");
+  listWrap.innerHTML = pendingPayments.length ? pendingPayments.map((p,i)=>`
+    <div class="result-line">
+      <span>${escapeHtml(p.from)} → ${escapeHtml(p.to)}</span>
+      <span class="amt pos" style="display:flex;align-items:center;gap:8px;">
+        ${p.amount.toFixed(2)} ₺
+        <button class="btn-danger btn-sm" data-idx="${i}">Sil</button>
+      </span>
+    </div>
+  `).join("") : `<div class="small-note">Henüz ödeme eklenmedi.</div>`;
+  listWrap.querySelectorAll("button[data-idx]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      pendingPayments.splice(parseInt(btn.getAttribute("data-idx")), 1);
+      renderPaymentInTotals();
+    });
+  });
+
+  renderBalanceList(document.getElementById("remainingBalancePreview2"), remaining);
+}
+
+document.getElementById("addPaymentBtn2").addEventListener("click", ()=>{
+  const from = document.getElementById("paymentFromSelect2").value;
+  const to = document.getElementById("paymentToSelect2").value;
+  const amount = parseFloat(document.getElementById("paymentAmountInput2").value);
+  if (!from || !to || from === to){ alert("Ödeyen ve alan farklı kişiler olmalı."); return; }
+  if (!amount || amount <= 0){ alert("Geçerli bir tutar girin."); return; }
+  pendingPayments.push({ from, to, amount });
+  document.getElementById("paymentAmountInput2").value = "";
+  renderTotalsScreen();
+});
+
+/* ===================== UTIL ===================== */
+/* Türkçe ünlü uyumuna göre isme yaklaşık datif ("-e/-a karşı") eki ekler. */
+function dativeName(name){
+  const vowels = "aeıioöuü";
+  const backVowels = "aıou";
+  const lastChar = name.slice(-1).toLocaleLowerCase("tr");
+  let lastVowel = null;
+  for (let i = name.length - 1; i >= 0; i--){
+    const c = name[i].toLocaleLowerCase("tr");
+    if (vowels.includes(c)){ lastVowel = c; break; }
+  }
+  const suffix = (lastVowel && backVowels.includes(lastVowel)) ? "a" : "e";
+  const buffer = vowels.includes(lastChar) ? "y" : "";
+  return `${name}'${buffer}${suffix}`;
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+/* Uygulama açılışta Masalar sekmesinde başlasın. */
+goScreen("s2");
+</script>
+</body>
+</html>
