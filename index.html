@@ -2423,11 +2423,15 @@ function renderTotalsScreen(){
 
   const gw = document.getElementById("grandTotalsWrap");
   const sorted = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
+  const totalSum = sorted.reduce((s,[,v])=>s+v, 0);
+  const isBalanced = Math.abs(totalSum) < 0.01;
   gw.innerHTML = sorted.length ? sorted.map(([name,amt])=>{
     const cls = amt>=0?"pos":"neg";
     const sign = amt>=0?"+":"";
     return `<div class="total-row"><span class="nm">${escapeHtml(name)}</span><span class="amt ${cls}">${sign}${amt.toFixed(2)} ₺</span></div>`;
-  }).join("") : `<div class="small-note">Henüz tamamlanmış el yok.</div>`;
+  }).join("") + `<div style="margin-top:8px;font-size:12px;text-align:right;color:${isBalanced?'#2a7a4b':'#c0392b'};">
+    ${isBalanced ? '✓ Dengede' : `⚠ Fark: ${totalSum>0?'+':''}${totalSum.toFixed(2)} ₺`}
+  </div>` : `<div class="small-note">Henüz tamamlanmış el yok.</div>`;
 
   // WhatsApp'ta Paylaş butonu için şu an ekranda gösterilen veriyi sakla.
   lastTotalsShareData = {
