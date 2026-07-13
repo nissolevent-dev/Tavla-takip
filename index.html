@@ -418,14 +418,6 @@
       <div id="grandTotalsWrap"></div>
       <button class="btn-soft btn-block" id="shareWhatsappTotalsBtn" style="margin-top:10px;">📲 Görsel Olarak Paylaş</button>
     </div>
-    <div class="card" id="paymentsCard" style="display:none;">
-      <h2>Yapılan Ödemeler</h2>
-      <div id="paymentsListView"></div>
-    </div>
-    <div class="card">
-      <h2>El Geçmişi</h2>
-      <div id="allHistoryWrap"></div>
-    </div>
     <div class="card" id="addPaymentCard">
       <h2>Ödeme Yap</h2>
       <div class="small-note" style="margin-bottom:10px;">Gerçekte kim kime ne kadar ödedi?</div>
@@ -439,10 +431,18 @@
         <button class="btn-soft" id="addPaymentBtn2" style="flex:0 0 70px;">Ekle</button>
       </div>
       <div id="paymentListWrap2" style="margin-top:10px;"></div>
-      <div class="card" style="margin-top:12px;padding:12px;background:var(--bg);">
+      <div style="margin-top:12px;padding:12px;background:var(--bg);border-radius:8px;">
         <div style="font-size:13px;font-weight:700;margin-bottom:6px;color:var(--gold-dark);">Kalan Bakiye</div>
         <div id="remainingBalancePreview2"></div>
       </div>
+    </div>
+    <div class="card" id="paymentsCard" style="display:none;">
+      <h2>Yapılan Ödemeler</h2>
+      <div id="paymentsListView"></div>
+    </div>
+    <div class="card">
+      <h2>El Geçmişi</h2>
+      <div id="allHistoryWrap"></div>
     </div>
   </div>
 
@@ -2421,7 +2421,14 @@ function renderTotalsScreen(){
     rows.forEach(h=>{
       const results = h.results || {};
       const winningSide = new Set(Array.isArray(h.sideA) ? (h.winner==="A" ? h.sideA : h.sideB) : []);
-      const winnerName = h.winnerSeated || h.winner;
+      // Kazanan ismi: winnerSeated varsa kullan, yoksa results'tan en yüksek pozitifi bul
+      let winnerName = h.winnerSeated;
+      if (!winnerName || winnerName === "A" || winnerName === "B"){
+        const pos = Object.entries(h.results||{})
+          .map(([n,r])=>({ n, v:(r&&typeof r==="object")?(r.total||0):(r||0) }))
+          .filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
+        winnerName = pos.length ? pos[0].n : (h.winner||"?");
+      }
       const winEntries = [], loseEntries = [];
       Object.entries(results).forEach(([n,r])=>{
         const val = (r && typeof r === "object") ? (r.total||0) : (r||0);
@@ -2449,15 +2456,20 @@ function renderTotalsScreen(){
     });
   }
 
-  // Ödeme Yap bölümü
-  renderPaymentInTotals();
+  // Ödeme Yap bölümü — ekranda gösterilen toplam bakiyeyi geçir
+  renderPaymentInTotals(totals);
 }
 
-function renderPaymentInTotals(){
-  const sid = STATE.activeSessionId;
-  const s = STATE.sessions[sid];
-  if (!s) return;
-  const totals = computeSessionHandTotals(s);
+function renderPaymentInTotals(baseTotals){
+  // baseTotals: ekranda gösterilen toplam (renderTotalsScreen'den geliyor)
+  // yoksa activeSession'dan hesapla (fallback)
+  let totals = baseTotals;
+  if (!totals){
+    const sid = STATE.activeSessionId;
+    const s = STATE.sessions[sid];
+    if (!s) return;
+    totals = computeSessionHandTotals(s);
+  }
   const remaining = applyPaymentsToTotals(Object.assign({}, totals), pendingPayments);
 
   // Eksi bakiyeli = ödeyecek, artı bakiyeli = alacak
@@ -2503,7 +2515,7 @@ document.getElementById("addPaymentBtn2").addEventListener("click", ()=>{
   if (!amount || amount <= 0){ alert("Geçerli bir tutar girin."); return; }
   pendingPayments.push({ from, to, amount });
   document.getElementById("paymentAmountInput2").value = "";
-  renderPaymentInTotals();
+  renderTotalsScreen();
 });
 
 /* ===================== UTIL ===================== */
