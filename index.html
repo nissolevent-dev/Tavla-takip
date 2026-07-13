@@ -427,7 +427,7 @@
           <div id="payerListWrap"></div>
           <div class="row" style="margin-top:6px;gap:6px;">
             <select id="payerSelect" style="flex:1;min-width:0;"></select>
-            <input type="number" id="payerAmount" placeholder="₺" style="width:60px;flex:0 0 60px;">
+            <input type="number" id="payerAmount" placeholder="₺" inputmode="numeric" style="width:60px;flex:0 0 60px;">
             <button class="btn-soft" id="addPayerBtn" style="flex:0 0 32px;padding:0;font-size:18px;">+</button>
           </div>
         </div>
@@ -436,7 +436,7 @@
           <div id="receiverListWrap"></div>
           <div class="row" style="margin-top:6px;gap:6px;">
             <select id="receiverSelect" style="flex:1;min-width:0;"></select>
-            <input type="number" id="receiverAmount" placeholder="₺" style="width:60px;flex:0 0 60px;">
+            <input type="number" id="receiverAmount" placeholder="₺" inputmode="numeric" style="width:60px;flex:0 0 60px;">
             <button class="btn-soft" id="addReceiverBtn" style="flex:0 0 32px;padding:0;font-size:18px;">+</button>
           </div>
         </div>
@@ -2418,6 +2418,9 @@ function renderTotalsScreen(){
     }
   }
 
+  // pendingPayments'ı toplam tablosuna uygula
+  applyPaymentsToTotals(totals, pendingPayments);
+
   const gw = document.getElementById("grandTotalsWrap");
   const sorted = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
   gw.innerHTML = sorted.length ? sorted.map(([name,amt])=>{
@@ -2479,8 +2482,16 @@ function renderTotalsScreen(){
     });
   }
 
-  // Ödeme Yap bölümü — ekranda gösterilen toplam bakiyeyi geçir
-  renderPaymentInTotals(totals);
+  // Ödeme Yap bölümü — ödeme uygulanmadan önceki totals'ı geçir
+  const totalsBeforePayment = {};
+  Object.entries(totals).forEach(([n,v])=>{
+    // pendingPayments'ı geri al: payers için ekle, receivers için çıkar
+    let adj = 0;
+    (pendingPayments.payers||[]).forEach(p=>{ if(p.name===n) adj+=p.amount; });
+    (pendingPayments.receivers||[]).forEach(p=>{ if(p.name===n) adj-=p.amount; });
+    totalsBeforePayment[n] = v - adj;
+  });
+  renderPaymentInTotals(totalsBeforePayment);
 }
 
 function renderPaymentInTotals(baseTotals){
