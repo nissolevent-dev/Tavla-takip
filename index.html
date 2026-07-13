@@ -2492,13 +2492,20 @@ function renderPaymentInTotals(baseTotals){
     totals = computeSessionHandTotals(s);
   }
 
-  // Selectleri doldur: tüm oyuncular
-  const allNames = Object.keys(totals||{});
-  const optHtml = allNames.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+  // Selectleri doldur: ödeyen = eksi bakiyeli, alan = artı bakiyeli
+  const remaining = applyPaymentsToTotals(Object.assign({}, totals), pendingPayments);
+  const debtors   = Object.entries(remaining).filter(([,v])=>v<-0.01).map(([n])=>n);
+  const creditors = Object.entries(remaining).filter(([,v])=>v>0.01).map(([n])=>n);
+  const allNames  = Object.keys(totals||{});
+  const payerNames = debtors.length ? debtors : allNames;
+  const recNames   = creditors.length ? creditors : allNames;
+
   const payerSel = document.getElementById("payerSelect");
   const recSel   = document.getElementById("receiverSelect");
-  if (payerSel && payerSel.innerHTML !== optHtml) payerSel.innerHTML = optHtml;
-  if (recSel   && recSel.innerHTML   !== optHtml) recSel.innerHTML   = optHtml;
+  const payerHtml = payerNames.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+  const recHtml   = recNames.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+  if (payerSel && payerSel.innerHTML !== payerHtml) payerSel.innerHTML = payerHtml;
+  if (recSel   && recSel.innerHTML   !== recHtml)   recSel.innerHTML   = recHtml;
 
   // Ödeyen listesi
   const payerWrap = document.getElementById("payerListWrap");
