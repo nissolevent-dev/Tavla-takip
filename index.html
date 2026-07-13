@@ -2156,7 +2156,7 @@ function finishHand(tableId, winnerSide, g, isMars){
 
   const gameNo = Object.keys(t.history||{}).length + 1;
   const historyRef = fbPush(`${tablesPath()}/${tableId}/history`, {
-    gameNo, winner: winnerSide, mars: !!isMars, results, time: Date.now()
+    gameNo, winner: winnerSide, mars: !!isMars, autoVido: (t.handsSinceReset === 0), results, time: Date.now()
   });
 
   const previousSnapshot = {
@@ -2406,7 +2406,7 @@ function renderTotalsScreen(){
       div.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
           <div>
-            <b>${escapeHtml(h.tname)}</b> · El ${h.gameNo} · ${h.winner} kazandı${h.mars ? ' <span style="color:var(--gold-dark);font-weight:800;">⭐ MARS</span>' : ''}
+            <b>${escapeHtml(h.tname)}</b> · El ${h.gameNo} · ${h.winner} kazandı${h.mars ? ' <span style="color:var(--gold-dark);font-weight:800;">⭐ MARS</span>' : ''}${h.autoVido ? ' <span style="color:var(--gold-dark);">🎲 x2</span>' : ''}
             <br><span class="small-note">${escapeHtml(resStr)}</span>
           </div>
           <button class="btn-danger btn-sm" style="flex:0 0 auto;">Sil</button>
