@@ -314,7 +314,7 @@
 
       <div id="tableListWrap"></div>
       <div class="empty-msg" id="noTableMsg">Henüz masa yok. "+ Yeni Masa" ile başlayın.</div>
-      <button class="btn-soft btn-block" id="closeSessionBtn2" style="margin-top:16px;">Oturumu Kapat (Ödeme Gir)</button>
+      <button class="btn-soft btn-block" id="closeSessionBtn2" style="margin-top:16px;">Oturumu Kapat</button>
       <button class="btn-danger btn-block" id="deleteSessionBtn" style="margin-top:8px;">Bu Oturumu Sil</button>
     </div>
 
@@ -425,6 +425,24 @@
     <div class="card">
       <h2>El Geçmişi</h2>
       <div id="allHistoryWrap"></div>
+    </div>
+    <div class="card" id="addPaymentCard">
+      <h2>Ödeme Yap</h2>
+      <div class="small-note" style="margin-bottom:10px;">Gerçekte kim kime ne kadar ödedi?</div>
+      <label>Ödeyen</label>
+      <select id="paymentFromSelect2"></select>
+      <label>Alan</label>
+      <select id="paymentToSelect2"></select>
+      <label>Tutar (₺)</label>
+      <div class="row">
+        <input type="number" id="paymentAmountInput2" placeholder="Örn: 50">
+        <button class="btn-soft" id="addPaymentBtn2" style="flex:0 0 70px;">Ekle</button>
+      </div>
+      <div id="paymentListWrap2" style="margin-top:10px;"></div>
+      <div class="card" style="margin-top:12px;padding:12px;background:var(--bg);">
+        <div style="font-size:13px;font-weight:700;margin-bottom:6px;color:var(--gold-dark);">Kalan Bakiye</div>
+        <div id="remainingBalancePreview2"></div>
+      </div>
     </div>
   </div>
 
@@ -2430,7 +2448,54 @@ function renderTotalsScreen(){
       hw.appendChild(div);
     });
   }
+
+  // Ödeme Yap bölümü
+  renderPaymentInTotals();
 }
+
+function renderPaymentInTotals(){
+  const sid = STATE.activeSessionId;
+  const s = STATE.sessions[sid];
+  if (!s) return;
+  const names = Object.keys(s.activePlayers||{});
+  const optHtml = names.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+  const fromSel = document.getElementById("paymentFromSelect2");
+  const toSel = document.getElementById("paymentToSelect2");
+  if (fromSel.innerHTML !== optHtml) fromSel.innerHTML = optHtml;
+  if (toSel.innerHTML !== optHtml) toSel.innerHTML = optHtml;
+
+  const listWrap = document.getElementById("paymentListWrap2");
+  listWrap.innerHTML = pendingPayments.length ? pendingPayments.map((p,i)=>`
+    <div class="result-line">
+      <span>${escapeHtml(p.from)} → ${escapeHtml(p.to)}</span>
+      <span class="amt pos" style="display:flex;align-items:center;gap:8px;">
+        ${p.amount.toFixed(2)} ₺
+        <button class="btn-danger btn-sm" data-idx="${i}">Sil</button>
+      </span>
+    </div>
+  `).join("") : `<div class="small-note">Henüz ödeme eklenmedi.</div>`;
+  listWrap.querySelectorAll("button[data-idx]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      pendingPayments.splice(parseInt(btn.getAttribute("data-idx")), 1);
+      renderPaymentInTotals();
+    });
+  });
+
+  const totals = computeSessionHandTotals(s);
+  const remaining = applyPaymentsToTotals(Object.assign({}, totals), pendingPayments);
+  renderBalanceList(document.getElementById("remainingBalancePreview2"), remaining);
+}
+
+document.getElementById("addPaymentBtn2").addEventListener("click", ()=>{
+  const from = document.getElementById("paymentFromSelect2").value;
+  const to = document.getElementById("paymentToSelect2").value;
+  const amount = parseFloat(document.getElementById("paymentAmountInput2").value);
+  if (!from || !to || from === to){ alert("Ödeyen ve alan farklı kişiler olmalı."); return; }
+  if (!amount || amount <= 0){ alert("Geçerli bir tutar girin."); return; }
+  pendingPayments.push({ from, to, amount });
+  document.getElementById("paymentAmountInput2").value = "";
+  renderPaymentInTotals();
+});
 
 /* ===================== UTIL ===================== */
 /* Türkçe ünlü uyumuna göre isme yaklaşık datif ("-e/-a karşı") eki ekler. */
