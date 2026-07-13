@@ -419,22 +419,29 @@
       <button class="btn-soft btn-block" id="shareWhatsappTotalsBtn" style="margin-top:10px;">📲 Görsel Olarak Paylaş</button>
     </div>
     <div class="card" id="addPaymentCard">
-      <h2>Ödeme Yap</h2>
-      <div class="small-note" style="margin-bottom:10px;">Gerçekte kim kime ne kadar ödedi?</div>
-      <label>Ödeyen</label>
-      <select id="paymentFromSelect2"></select>
-      <label>Alan</label>
-      <select id="paymentToSelect2"></select>
-      <label>Tutar (₺)</label>
-      <div class="row">
-        <input type="number" id="paymentAmountInput2" placeholder="Örn: 50">
-        <button class="btn-soft" id="addPaymentBtn2" style="flex:0 0 70px;">Ekle</button>
+      <h2>Ödeme / Tahsilat</h2>
+      <div class="small-note" style="margin-bottom:12px;">Ödeyenleri ve alanları ayrı ayrı girin. Toplam tablosundan otomatik düşülür.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#c0392b;margin-bottom:6px;text-transform:uppercase;">Ödeyen</div>
+          <div id="payerListWrap"></div>
+          <div class="row" style="margin-top:6px;gap:6px;">
+            <select id="payerSelect" style="flex:1;min-width:0;"></select>
+            <input type="number" id="payerAmount" placeholder="₺" style="width:60px;flex:0 0 60px;">
+            <button class="btn-soft" id="addPayerBtn" style="flex:0 0 32px;padding:0;font-size:18px;">+</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:var(--green-dark,#2a7a4b);margin-bottom:6px;text-transform:uppercase;">Alan</div>
+          <div id="receiverListWrap"></div>
+          <div class="row" style="margin-top:6px;gap:6px;">
+            <select id="receiverSelect" style="flex:1;min-width:0;"></select>
+            <input type="number" id="receiverAmount" placeholder="₺" style="width:60px;flex:0 0 60px;">
+            <button class="btn-soft" id="addReceiverBtn" style="flex:0 0 32px;padding:0;font-size:18px;">+</button>
+          </div>
+        </div>
       </div>
-      <div id="paymentListWrap2" style="margin-top:10px;"></div>
-      <div style="margin-top:12px;padding:12px;background:var(--bg);border-radius:8px;">
-        <div style="font-size:13px;font-weight:700;margin-bottom:6px;color:var(--gold-dark);">Kalan Bakiye</div>
-        <div id="remainingBalancePreview2"></div>
-      </div>
+      <div id="paymentBalanceNote" style="margin-top:10px;font-size:12px;color:#888;text-align:center;"></div>
     </div>
     <div class="card" id="paymentsCard" style="display:none;">
       <h2>Yapılan Ödemeler</h2>
@@ -563,7 +570,7 @@ let sessionPlayerPick = {};
 let forcingNewSession = false;
 let totalsSelectedSession = null;
 let lastTotalsShareData = null;
-let pendingPayments = [];
+let pendingPayments = { payers: [], receivers: [] };
 
 /* ===================== FIREBASE SYNC ===================== */
 ROOT.on("value", snap => {
@@ -1088,10 +1095,21 @@ function computeSessionHandTotals(session){
   return totals;
 }
 function applyPaymentsToTotals(totals, payments){
-  (payments||[]).forEach(p=>{
-    totals[p.from] = (totals[p.from]||0) + p.amount;
-    totals[p.to] = (totals[p.to]||0) - p.amount;
-  });
+  // Yeni format: { payers: [{name, amount}], receivers: [{name, amount}] }
+  // Eski format: [{from, to, amount}] — geriye dönük uyumluluk
+  if (Array.isArray(payments)){
+    payments.forEach(p=>{
+      totals[p.from] = (totals[p.from]||0) + p.amount;
+      totals[p.to]   = (totals[p.to]||0)   - p.amount;
+    });
+  } else if (payments && typeof payments === "object"){
+    (payments.payers||[]).forEach(p=>{
+      totals[p.name] = (totals[p.name]||0) + p.amount;
+    });
+    (payments.receivers||[]).forEach(p=>{
+      totals[p.name] = (totals[p.name]||0) - p.amount;
+    });
+  }
   return totals;
 }
 function renderBalanceList(container, totals){
@@ -1274,7 +1292,7 @@ async function shareBalanceCard(title, totals, payments){
 
 document.getElementById("closeSessionBtn2").addEventListener("click", ()=>{
   if (!STATE.activeSessionId) return;
-  pendingPayments = [];
+  pendingPayments = { payers: [], receivers: [] };
   goScreen("s7");
 });
 
@@ -1300,8 +1318,9 @@ function renderCloseSessionScreen(){
   if (fromSel.innerHTML !== optHtml) fromSel.innerHTML = optHtml;
   if (toSel.innerHTML !== optHtml) toSel.innerHTML = optHtml;
 
+  const legacyList = (pendingPayments && pendingPayments._legacy) || [];
   const listWrap = document.getElementById("paymentListWrap");
-  listWrap.innerHTML = pendingPayments.length ? pendingPayments.map((p,i)=>`
+  listWrap.innerHTML = legacyList.length ? legacyList.map((p,i)=>`
     <div class="result-line">
       <span>${escapeHtml(p.from)} → ${escapeHtml(p.to)}</span>
       <span class="amt pos" style="display:flex;align-items:center;gap:8px;">
@@ -1312,12 +1331,12 @@ function renderCloseSessionScreen(){
   `).join("") : `<div class="small-note">Henüz ödeme eklenmedi.</div>`;
   listWrap.querySelectorAll("button[data-idx]").forEach(btn=>{
     btn.addEventListener("click", ()=>{
-      pendingPayments.splice(parseInt(btn.getAttribute("data-idx")), 1);
+      legacyList.splice(parseInt(btn.getAttribute("data-idx")), 1);
       renderCloseSessionScreen();
     });
   });
 
-  const remaining = applyPaymentsToTotals(Object.assign({}, totals), pendingPayments);
+  const remaining = applyPaymentsToTotals(Object.assign({}, totals), legacyList);
   renderBalanceList(document.getElementById("remainingBalancePreview"), remaining);
 }
 
@@ -1327,7 +1346,11 @@ document.getElementById("addPaymentBtn").addEventListener("click", ()=>{
   const amount = parseFloat(document.getElementById("paymentAmountInput").value);
   if (!from || !to || from === to){ alert("Ödeyen ve alan farklı kişiler olmalı."); return; }
   if (!amount || amount <= 0){ alert("Geçerli bir tutar girin."); return; }
-  pendingPayments.push({ from, to, amount });
+  // Eski format: {from, to, amount} — s7 ekranı hâlâ kullanıyor
+  if (!Array.isArray(pendingPayments)) pendingPayments = { payers: [], receivers: [] };
+  // s7'de geçici olarak eski listeye ekle (oturum kapatırken array olarak kaydedilecek)
+  if (!pendingPayments._legacy) pendingPayments._legacy = [];
+  pendingPayments._legacy.push({ from, to, amount });
   document.getElementById("paymentAmountInput").value = "";
   renderCloseSessionScreen();
 });
@@ -1340,10 +1363,10 @@ document.getElementById("confirmCloseSessionBtn").addEventListener("click", ()=>
     fbUpdate(`sessions/${sid}`, {
       closed: true,
       closedAt: Date.now(),
-      payments: pendingPayments
+      payments: (pendingPayments && pendingPayments._legacy) || []
     });
     fbSet("activeSessionId", null);
-    pendingPayments = [];
+    pendingPayments = { payers: [], receivers: [] };
     sessionPlayerPick = {};
     forcingNewSession = false;
     goScreen("s2");
@@ -2461,8 +2484,6 @@ function renderTotalsScreen(){
 }
 
 function renderPaymentInTotals(baseTotals){
-  // baseTotals: ekranda gösterilen toplam (renderTotalsScreen'den geliyor)
-  // yoksa activeSession'dan hesapla (fallback)
   let totals = baseTotals;
   if (!totals){
     const sid = STATE.activeSessionId;
@@ -2470,55 +2491,85 @@ function renderPaymentInTotals(baseTotals){
     if (!s) return;
     totals = computeSessionHandTotals(s);
   }
-  const remaining = applyPaymentsToTotals(Object.assign({}, totals), pendingPayments);
 
-  // Eksi bakiyeli = ödeyecek, artı bakiyeli = alacak
-  const debtors   = Object.entries(remaining).filter(([,v])=>v<0).map(([n])=>n);
-  const creditors = Object.entries(remaining).filter(([,v])=>v>0).map(([n])=>n);
-  // Fallback: totals'taki tüm isimler (boşsa aktif oturum oyuncuları)
-  let allNames = Object.keys(totals||{});
-  if (!allNames.length){
-    const s = STATE.sessions[STATE.activeSessionId];
-    allNames = s ? Object.keys(s.activePlayers||{}) : [];
+  // Selectleri doldur: tüm oyuncular
+  const allNames = Object.keys(totals||{});
+  const optHtml = allNames.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+  const payerSel = document.getElementById("payerSelect");
+  const recSel   = document.getElementById("receiverSelect");
+  if (payerSel && payerSel.innerHTML !== optHtml) payerSel.innerHTML = optHtml;
+  if (recSel   && recSel.innerHTML   !== optHtml) recSel.innerHTML   = optHtml;
+
+  // Ödeyen listesi
+  const payerWrap = document.getElementById("payerListWrap");
+  if (payerWrap){
+    payerWrap.innerHTML = (pendingPayments.payers||[]).map((p,i)=>`
+      <div class="result-line" style="font-size:13px;">
+        <span>${escapeHtml(p.name)}</span>
+        <span style="display:flex;align-items:center;gap:6px;">
+          <span style="color:#c0392b;">−${p.amount.toFixed(0)} ₺</span>
+          <button class="btn-danger btn-sm" data-type="payer" data-idx="${i}">×</button>
+        </span>
+      </div>`).join("") || `<div class="small-note" style="font-size:12px;">Henüz yok</div>`;
   }
 
-  const fromSel = document.getElementById("paymentFromSelect2");
-  const toSel   = document.getElementById("paymentToSelect2");
-  const fromNames = debtors.length ? debtors : allNames;
-  const toNames   = creditors.length ? creditors : allNames;
-  const fromHtml = fromNames.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
-  const toHtml   = toNames.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
-  if (fromSel.innerHTML !== fromHtml) fromSel.innerHTML = fromHtml;
-  if (toSel.innerHTML !== toHtml)     toSel.innerHTML = toHtml;
+  // Alan listesi
+  const recWrap = document.getElementById("receiverListWrap");
+  if (recWrap){
+    recWrap.innerHTML = (pendingPayments.receivers||[]).map((p,i)=>`
+      <div class="result-line" style="font-size:13px;">
+        <span>${escapeHtml(p.name)}</span>
+        <span style="display:flex;align-items:center;gap:6px;">
+          <span style="color:var(--green-dark,#2a7a4b);">+${p.amount.toFixed(0)} ₺</span>
+          <button class="btn-danger btn-sm" data-type="receiver" data-idx="${i}">×</button>
+        </span>
+      </div>`).join("") || `<div class="small-note" style="font-size:12px;">Henüz yok</div>`;
+  }
 
-  const listWrap = document.getElementById("paymentListWrap2");
-  listWrap.innerHTML = pendingPayments.length ? pendingPayments.map((p,i)=>`
-    <div class="result-line">
-      <span>${escapeHtml(p.from)} → ${escapeHtml(p.to)}</span>
-      <span class="amt pos" style="display:flex;align-items:center;gap:8px;">
-        ${p.amount.toFixed(2)} ₺
-        <button class="btn-danger btn-sm" data-idx="${i}">Sil</button>
-      </span>
-    </div>
-  `).join("") : `<div class="small-note">Henüz ödeme eklenmedi.</div>`;
-  listWrap.querySelectorAll("button[data-idx]").forEach(btn=>{
+  // Sil butonları
+  document.querySelectorAll("#payerListWrap [data-type], #receiverListWrap [data-type]").forEach(btn=>{
     btn.addEventListener("click", ()=>{
-      pendingPayments.splice(parseInt(btn.getAttribute("data-idx")), 1);
-      renderPaymentInTotals();
+      const type = btn.getAttribute("data-type");
+      const idx  = parseInt(btn.getAttribute("data-idx"));
+      if (type === "payer")    pendingPayments.payers.splice(idx, 1);
+      if (type === "receiver") pendingPayments.receivers.splice(idx, 1);
+      renderTotalsScreen();
     });
   });
 
-  renderBalanceList(document.getElementById("remainingBalancePreview2"), remaining);
+  // Denge notu
+  const totalPaid = (pendingPayments.payers||[]).reduce((s,p)=>s+p.amount, 0);
+  const totalRec  = (pendingPayments.receivers||[]).reduce((s,p)=>s+p.amount, 0);
+  const note = document.getElementById("paymentBalanceNote");
+  if (note){
+    if (totalPaid === 0 && totalRec === 0){
+      note.textContent = "";
+    } else {
+      const diff = totalPaid - totalRec;
+      note.textContent = `Ödenen: ${totalPaid.toFixed(0)} ₺ · Alınan: ${totalRec.toFixed(0)} ₺` +
+        (Math.abs(diff) > 0.01 ? ` · Fark: ${diff>0?'+':''}${diff.toFixed(0)} ₺` : " · ✓ Dengede");
+      note.style.color = Math.abs(diff) > 0.01 ? "#c0392b" : "#2a7a4b";
+    }
+  }
 }
 
-document.getElementById("addPaymentBtn2").addEventListener("click", ()=>{
-  const from = document.getElementById("paymentFromSelect2").value;
-  const to = document.getElementById("paymentToSelect2").value;
-  const amount = parseFloat(document.getElementById("paymentAmountInput2").value);
-  if (!from || !to || from === to){ alert("Ödeyen ve alan farklı kişiler olmalı."); return; }
+document.getElementById("addPayerBtn").addEventListener("click", ()=>{
+  const name = document.getElementById("payerSelect").value;
+  const amount = parseFloat(document.getElementById("payerAmount").value);
+  if (!name) return;
   if (!amount || amount <= 0){ alert("Geçerli bir tutar girin."); return; }
-  pendingPayments.push({ from, to, amount });
-  document.getElementById("paymentAmountInput2").value = "";
+  pendingPayments.payers.push({ name, amount });
+  document.getElementById("payerAmount").value = "";
+  renderTotalsScreen();
+});
+
+document.getElementById("addReceiverBtn").addEventListener("click", ()=>{
+  const name = document.getElementById("receiverSelect").value;
+  const amount = parseFloat(document.getElementById("receiverAmount").value);
+  if (!name) return;
+  if (!amount || amount <= 0){ alert("Geçerli bir tutar girin."); return; }
+  pendingPayments.receivers.push({ name, amount });
+  document.getElementById("receiverAmount").value = "";
   renderTotalsScreen();
 });
 
