@@ -1986,16 +1986,26 @@ function renderVidoCallersAndSeers(){
 
   const callersWrap = document.getElementById("vidoCallersWrap");
   callersWrap.innerHTML = "";
+
+  // Seçili çekenlerin tarafını belirle
+  const selectedSide = selectedVidoCallers.length > 0
+    ? sideOf(t, selectedVidoCallers[0])
+    : null;
+
   ["A","B"].forEach(side=>{
     sideNames(t, side).forEach(name=>{
       const targets = callableTargets(t, name);
-      if (targets.length === 0) return; // çekemiyorsa listede bile gösterme
+      if (targets.length === 0) return;
       const btn = document.createElement("button");
       const isSel = selectedVidoCallers.includes(name);
+      // Karşı taraftan biri seçildiyse bu taraf disabled
+      const isBlocked = selectedSide !== null && side !== selectedSide;
       btn.className = "pick " + (side==="A" ? "sel-a" : "sel-b") + (isSel ? "" : " not-selected-caller");
-      if (!isSel) btn.style.opacity = ".45";
+      if (!isSel) btn.style.opacity = isBlocked ? ".2" : ".45";
+      btn.disabled = isBlocked;
       btn.textContent = `🎲 ${name}`;
       btn.addEventListener("click", ()=>{
+        if (isBlocked) return;
         const idx = selectedVidoCallers.indexOf(name);
         if (idx>-1) selectedVidoCallers.splice(idx,1);
         else selectedVidoCallers.push(name);
