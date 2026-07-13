@@ -2397,17 +2397,28 @@ function renderTotalsScreen(){
     hw.innerHTML = `<div class="small-note">Henüz tamamlanmış el yok.</div>`;
   } else {
     rows.forEach(h=>{
-      const resStr = Object.entries(h.results||{}).map(([n,r])=>{
+      const results = h.results || {};
+      // Kazananlar (pozitif) ve kaybedenler (negatif) ayrı listele, takım sırası korunuyor
+      const winners = [], losers = [];
+      Object.entries(results).forEach(([n,r])=>{
         const val = (r && typeof r === "object") ? (r.total||0) : (r||0);
-        return `${n}: ${val>=0?'+':''}${val.toFixed(0)}`;
-      }).join(" · ");
+        if (val >= 0) winners.push({n, val});
+        else losers.push({n, val});
+      });
+      // Kazanan isimlerini başlıkta göster
+      const winnerNames = winners.map(w=>escapeHtml(w.n)).join(' + ');
+      // Sonuç satırı: önce kazananlar, sonra kaybedenler
+      const resStr = [
+        ...winners.map(({n,val})=>`<span style="color:var(--green-dark,#2a7a4b);font-weight:600;">${escapeHtml(n)} +${val.toFixed(0)}</span>`),
+        ...losers.map(({n,val})=>`<span style="color:#c0392b;">${escapeHtml(n)} ${val.toFixed(0)}</span>`)
+      ].join(' · ');
       const div = document.createElement("div");
       div.className = "history-item";
       div.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
           <div>
-            <b>${escapeHtml(h.tname)}</b> · El ${h.gameNo} · ${h.winner} kazandı${h.mars ? ' <span style="color:var(--gold-dark);font-weight:800;">⭐ MARS</span>' : ''}${h.autoVido ? ' <span style="color:var(--gold-dark);">🎲 x2</span>' : ''}
-            <br><span class="small-note">${escapeHtml(resStr)}</span>
+            <b>${escapeHtml(h.tname)}</b> · El ${h.gameNo} · <b>${winnerNames}</b> kazandı${h.mars ? ' <span style="color:var(--gold-dark);font-weight:800;">⭐ MARS</span>' : ''}${h.autoVido ? ' <span style="color:var(--gold-dark);">🎲 x2</span>' : ''}
+            <br><span class="small-note">${resStr}</span>
           </div>
           <button class="btn-danger btn-sm" style="flex:0 0 auto;">Sil</button>
         </div>`;
