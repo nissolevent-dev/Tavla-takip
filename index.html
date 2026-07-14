@@ -2257,9 +2257,26 @@ function finishHand(tableId, winnerSide, g, isMars){
 
   let newRotation = null;
   if (t.usesRotation){
+    // Görmedi oturan varsa: o kişinin tarafı rotasyonda kaybetmiş sayılır.
+    // Yani görmedi oturan kuyruktan çıkar, karşı tarafın oturanı masada kalır.
+    let rotationWinnerSide = winnerSide;
+    if (seatedPlayerGormedí){
+      // Hangi oturan görmedi?
+      const aGormedi = Object.entries(g.pairs||{}).some(([a,oppMap])=>
+        a === t.seated.A && Object.values(oppMap||{}).some(p=>p.closed && p.closedLoser === t.seated.A)
+      );
+      const bGormedi = Object.entries(g.pairs||{}).some(([a,oppMap])=>
+        a === t.seated.B && Object.values(oppMap||{}).some(p=>p.closed && p.closedLoser === t.seated.B)
+      ) || Object.entries(g.pairs||{}).some(([a,oppMap])=>
+        Object.entries(oppMap||{}).some(([b,p])=>b === t.seated.B && p.closed && p.closedLoser === t.seated.B)
+      );
+      // Görmedi oturanın tarafı rotasyonda kaybetti sayılır
+      if (aGormedi) rotationWinnerSide = "B";
+      else if (bGormedi) rotationWinnerSide = "A";
+    }
     const next = t.format === "2v2"
-      ? advanceRotation_2v2(t, winnerSide)
-      : advanceRotation(t, winnerSide);
+      ? advanceRotation_2v2(t, rotationWinnerSide)
+      : advanceRotation(t, rotationWinnerSide);
     newRotation = next;
     fbUpdate(`${tablesPath()}/${tableId}`, {
       game: g,
