@@ -1858,6 +1858,7 @@ function startGameForTable(id, autoVidoCount){
       Object.values(oppMap).forEach(p=>{ p.count = autoVidoCount; });
     });
   }
+  game.isAutoVidoHand = isAutoVidoHand;
   const newHandsSinceReset = isAutoVidoHand ? 0 : (t.handsSinceReset !== undefined ? t.handsSinceReset : 1);
   fbUpdate(`${tablesPath()}/${id}`, { game, autoVidoNextHand: false, handsSinceReset: newHandsSinceReset });
   goScreen("s4", id);
@@ -1914,7 +1915,7 @@ function renderGameScreen(){
   document.getElementById("finishedPanel").style.display = finished ? "block" : "none";
 
   // Otomatik vido bandı: el canlıyken ve pairs'te count>0 ise göster
-  const isAutoVidoEl = !finished && t.handsSinceReset === 0;
+  const isAutoVidoEl = !finished && !!(g.isAutoVidoHand);
   document.getElementById("autoVidoBand").style.display = isAutoVidoEl ? "block" : "none";
 
   if (!finished && t.seated){
@@ -2241,8 +2242,7 @@ function finishHand(tableId, winnerSide, g, isMars){
   // Bu el otomatik vidolu muydu?
   // startGameForTable otomatik vido elinde handsSinceReset=0 yazar,
   // normal elde değiştirmez. Bu en güvenilir işaret.
-  const wasAutoVidoEl = (t.handsSinceReset === 0);
-  console.log('DEBUG finishHand: handsSinceReset='+t.handsSinceReset+' wasAutoVido='+wasAutoVidoEl+' isMars='+isMars+' seatedGormedi='+seatedPlayerGormedí);
+  const wasAutoVidoEl = !!(g.isAutoVidoHand);
   const marsOrGormedi = wasAutoVidoEl && !!(isMars || seatedPlayerGormedí);
   let handsSinceReset, autoVidoNextHand;
   if (marsOrGormedi){
