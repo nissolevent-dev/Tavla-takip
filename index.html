@@ -2257,22 +2257,17 @@ function finishHand(tableId, winnerSide, g, isMars){
 
   let newRotation = null;
   if (t.usesRotation){
-    // Görmedi oturan varsa: o kişinin tarafı rotasyonda kaybetmiş sayılır.
-    // Yani görmedi oturan kuyruktan çıkar, karşı tarafın oturanı masada kalır.
+    // Özel kural: Kazanan tarafın oturanı hiç vido görmediyse
+    // (vidoLog'da o kişiye ait saw=true kaydı yoksa) rotasyonda kaybetmiş sayılır.
+    // Yani karşı tarafın oturanı masada kalır, görmedi oturan yardımcı olur.
     let rotationWinnerSide = winnerSide;
-    if (seatedPlayerGormedí){
-      // Hangi oturan görmedi?
-      const aGormedi = Object.entries(g.pairs||{}).some(([a,oppMap])=>
-        a === t.seated.A && Object.values(oppMap||{}).some(p=>p.closed && p.closedLoser === t.seated.A)
-      );
-      const bGormedi = Object.entries(g.pairs||{}).some(([a,oppMap])=>
-        a === t.seated.B && Object.values(oppMap||{}).some(p=>p.closed && p.closedLoser === t.seated.B)
-      ) || Object.entries(g.pairs||{}).some(([a,oppMap])=>
-        Object.entries(oppMap||{}).some(([b,p])=>b === t.seated.B && p.closed && p.closedLoser === t.seated.B)
-      );
-      // Görmedi oturanın tarafı rotasyonda kaybetti sayılır
-      if (aGormedi) rotationWinnerSide = "B";
-      else if (bGormedi) rotationWinnerSide = "A";
+    const seatedWinner = winnerSide === "A" ? t.seated.A : t.seated.B;
+    const vidoLog = g.vidoLog || [];
+    const winnerSeatedEverSaw = vidoLog.some(v => v.opponent === seatedWinner && v.saw);
+    if (!winnerSeatedEverSaw && vidoLog.some(v => v.opponent === seatedWinner && !v.saw)){
+      // Kazanan tarafın oturanı en az bir vidoyu görmedi VE hiç görmedi
+      // → rotasyonda karşı taraf kazanmış say
+      rotationWinnerSide = winnerSide === "A" ? "B" : "A";
     }
     const next = t.format === "2v2"
       ? advanceRotation_2v2(t, rotationWinnerSide)
