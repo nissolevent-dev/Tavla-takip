@@ -2262,11 +2262,15 @@ function finishHand(tableId, winnerSide, g, isMars){
     // Yani karşı tarafın oturanı masada kalır, görmedi oturan yardımcı olur.
     let rotationWinnerSide = winnerSide;
     const seatedWinner = winnerSide === "A" ? t.seated.A : t.seated.B;
+    const seatedLoser  = winnerSide === "A" ? t.seated.B : t.seated.A;
     const vidoLog = g.vidoLog || [];
-    const winnerSeatedEverSaw = vidoLog.some(v => v.opponent === seatedWinner && v.saw);
-    if (!winnerSeatedEverSaw && vidoLog.some(v => v.opponent === seatedWinner && !v.saw)){
-      // Kazanan tarafın oturanı en az bir vidoyu görmedi VE hiç görmedi
-      // → rotasyonda karşı taraf kazanmış say
+    const sawOpponentSeated = vidoLog.some(v =>
+      v.opponent === seatedWinner && v.saw && v.caller === seatedLoser
+    );
+    const missedOpponentSeated = vidoLog.some(v =>
+      v.opponent === seatedWinner && !v.saw && v.caller === seatedLoser
+    );
+    if (missedOpponentSeated && !sawOpponentSeated){
       rotationWinnerSide = winnerSide === "A" ? "B" : "A";
     }
     const next = t.format === "2v2"
