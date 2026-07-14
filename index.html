@@ -2242,6 +2242,7 @@ function finishHand(tableId, winnerSide, g, isMars){
   // startGameForTable otomatik vido elinde handsSinceReset=0 yazar,
   // normal elde değiştirmez. Bu en güvenilir işaret.
   const wasAutoVidoEl = (t.handsSinceReset === 0);
+  console.log('DEBUG finishHand: handsSinceReset='+t.handsSinceReset+' wasAutoVido='+wasAutoVidoEl+' isMars='+isMars+' seatedGormedi='+seatedPlayerGormedí);
   const marsOrGormedi = wasAutoVidoEl && !!(isMars || seatedPlayerGormedí);
   let handsSinceReset, autoVidoNextHand;
   if (marsOrGormedi){
