@@ -2005,6 +2005,14 @@ function renderVidoCallersAndSeers(){
       if (!isSel) btn.style.opacity = isBlocked ? ".2" : ".45";
       btn.disabled = isBlocked;
       btn.textContent = `🎲 ${name}`;
+      const vidoTargets = callableTargets(t, name);
+      if (vidoTargets.length > 0){
+        const maxCount = Math.max(...vidoTargets.map(tgt=>{
+          const {p} = getPairCell(t, name, tgt);
+          return p ? p.count : 0;
+        }));
+        if (maxCount > 0) btn.textContent = `🎲 ${name} (${maxCount+1}. vido)`;
+      }
       btn.addEventListener("click", ()=>{
         if (isBlocked) return;
         const idx = selectedVidoCallers.indexOf(name);
