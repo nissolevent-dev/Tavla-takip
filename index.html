@@ -2220,7 +2220,7 @@ function finishHand(tableId, winnerSide, g, isMars){
     winnerSeated: winnerSide === "A" ? t.seated.A : t.seated.B,
     sideA: Object.keys({[t.seated.A]:true, ...(t.partners.A||{})}),
     sideB: Object.keys({[t.seated.B]:true, ...(t.partners.B||{})}),
-    results, time: Date.now()
+    results, vidoLog: g.vidoLog||[], time: Date.now()
   });
 
   const previousSnapshot = {
@@ -2511,7 +2511,30 @@ function renderTotalsScreen(){
             <br><span class="small-note">${resStr}</span>
           </div>
           <button class="btn-danger btn-sm" style="flex:0 0 auto;">Sil</button>
-        </div>`;
+        </div>
+        <div class="vido-log-detail" style="display:none;margin-top:6px;padding:6px 0;border-top:1px solid var(--line);font-size:12px;color:#555;"></div>`;
+      // Vido detayı toggle
+      div.querySelector(".result-line, div").addEventListener("click", (e)=>{
+        if (e.target.closest("button")) return;
+        const detail = div.querySelector(".vido-log-detail");
+        if (detail.style.display === "none"){
+          const vl = h.vidoLog || [];
+          if (!vl.length){ detail.textContent = "Bu elde vido çekilmedi."; }
+          else {
+            detail.innerHTML = vl.map(v=>`
+              <div style="padding:2px 0;">
+                🎲 <b>${escapeHtml(v.caller)}</b> çekti &rarr; ${escapeHtml(v.opponent)}:
+                ${v.saw
+                  ? `<span style="color:var(--green-dark,#2a7a4b);">Gördü (x${Math.pow(2,v.from+1)})</span>`
+                  : `<span style="color:#c0392b;">Görmedi (x${Math.pow(2,v.from)} kapandı)</span>`
+                }
+              </div>`).join("");
+          }
+          detail.style.display = "block";
+        } else {
+          detail.style.display = "none";
+        }
+      });
       div.querySelector("button").addEventListener("click", ()=>{
         if (confirm("Bu el silinsin mi? Toplamlardan da çıkarılacak.")){
           fbRemove(`sessions/${h.sessionId}/tables/${h.tableId}/history/${h.historyId}`);
