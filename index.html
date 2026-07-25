@@ -1982,8 +1982,8 @@ function renderSideBox(side, t){
 document.getElementById("vidoCalledBtn").addEventListener("click", ()=>{
   const t = STATE.tables[currentTableId];
   if (!t || !t.game) return;
-  // Vido öncesi game'i sakla (geri al için)
-  gameBeforeVido = JSON.parse(JSON.stringify(t.game));
+  // Vido öncesi game'i stack'e ekle (geri al için)
+  vidoStack.push(JSON.parse(JSON.stringify(t.game)));
   document.getElementById("undoVidoBtn").style.display = "none";
   selectedVidoCallers = [];
   selectedVidoSeers = {};
