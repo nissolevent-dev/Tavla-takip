@@ -358,6 +358,7 @@
       <div id="liveControls">
         <div style="text-align:right;margin-bottom:4px;">
           <button class="btn-soft btn-sm" id="undoHandBtn" style="font-size:12px;padding:4px 10px;">↩ Bu eli geri al</button>
+          <button class="btn-soft btn-sm" id="undoVidoBtn" style="font-size:12px;padding:4px 10px;display:none;">↩ Vidoyu geri al</button>
         </div>
         <button class="btn-main" id="vidoCalledBtn">🎲 Vido Çekildi</button>
         <div class="row" style="margin-top:16px;">
@@ -566,6 +567,7 @@ let currentTableId = null;
 let dicePick = { ranking: [] };
 let selectedVidoCallers = [];
 let selectedVidoSeers = {};
+let gameBeforeVido = null; // Vido geri al için snapshot
 let sessionPlayerPick = {};
 let forcingNewSession = false;
 let totalsSelectedSession = null;
@@ -1861,6 +1863,9 @@ function startGameForTable(id, autoVidoCount){
   game.isAutoVidoHand = isAutoVidoHand;
   const newHandsSinceReset = isAutoVidoHand ? 0 : (t.handsSinceReset !== undefined ? t.handsSinceReset : 1);
   fbUpdate(`${tablesPath()}/${id}`, { game, autoVidoNextHand: false, handsSinceReset: newHandsSinceReset });
+  gameBeforeVido = null;
+  const uvBtn = document.getElementById("undoVidoBtn");
+  if (uvBtn) uvBtn.style.display = "none";
   goScreen("s4", id);
 }
 
@@ -1975,6 +1980,11 @@ function renderSideBox(side, t){
    rakiplerinin birleşimi "görenler" listesi olarak çıkar. Varsayılan
    olarak herkes "görmüş" sayılır, görmeyen tek tek çıkarılır. */
 document.getElementById("vidoCalledBtn").addEventListener("click", ()=>{
+  const t = STATE.tables[currentTableId];
+  if (!t || !t.game) return;
+  // Vido öncesi game'i sakla (geri al için)
+  gameBeforeVido = JSON.parse(JSON.stringify(t.game));
+  document.getElementById("undoVidoBtn").style.display = "none";
   selectedVidoCallers = [];
   selectedVidoSeers = {};
   goScreen("s5");
@@ -2112,6 +2122,8 @@ document.getElementById("confirmVidoBtn").addEventListener("click", ()=>{
     } else {
       fbSet(`${tablesPath()}/${currentTableId}/game`, g);
     }
+    // Vido geri al butonu — bir önceki game state'i sakla
+    document.getElementById("undoVidoBtn").style.display = "inline-block";
     goScreen("s4");
   } catch(e){
     console.error(e);
@@ -2218,8 +2230,8 @@ function finishHand(tableId, winnerSide, g, isMars){
   const historyRef = fbPush(`${tablesPath()}/${tableId}/history`, {
     gameNo, winner: winnerSide, mars: !!isMars, autoVido: (t.handsSinceReset === 0),
     winnerSeated: winnerSide === "A" ? t.seated.A : t.seated.B,
-    sideA: Object.keys({[t.seated.A]:true, ...(t.partners.A||{})}),
-    sideB: Object.keys({[t.seated.B]:true, ...(t.partners.B||{})}),
+    sideA: Object.keys({[t.seated.A]:true, ...((t.partners&&t.partners.A)||{})}),
+    sideB: Object.keys({[t.seated.B]:true, ...((t.partners&&t.partners.B)||{})}),
     results, vidoLog: g.vidoLog||[], time: Date.now()
   });
 
@@ -2332,6 +2344,14 @@ document.getElementById("nextHandBtn").addEventListener("click", ()=>{
     console.error(e);
     alert("Yeni el başlatılırken bir hata oluştu: " + e.message);
   }
+});
+
+document.getElementById("undoVidoBtn").addEventListener("click", ()=>{
+  if (!gameBeforeVido){ alert("Geri alınacak vido yok."); return; }
+  if (!confirm("Son vido iptal edilsin mi?")) return;
+  fbSet(`${tablesPath()}/${currentTableId}/game`, gameBeforeVido);
+  gameBeforeVido = null;
+  document.getElementById("undoVidoBtn").style.display = "none";
 });
 
 document.getElementById("undoHandBtn").addEventListener("click", ()=>{
