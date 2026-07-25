@@ -567,7 +567,7 @@ let currentTableId = null;
 let dicePick = { ranking: [] };
 let selectedVidoCallers = [];
 let selectedVidoSeers = {};
-let gameBeforeVido = null; // Vido geri al için snapshot
+let vidoStack = []; // her vido öncesi game snapshot'ı // Vido geri al için snapshot
 let sessionPlayerPick = {};
 let forcingNewSession = false;
 let totalsSelectedSession = null;
@@ -1863,7 +1863,7 @@ function startGameForTable(id, autoVidoCount){
   game.isAutoVidoHand = isAutoVidoHand;
   const newHandsSinceReset = isAutoVidoHand ? 0 : (t.handsSinceReset !== undefined ? t.handsSinceReset : 1);
   fbUpdate(`${tablesPath()}/${id}`, { game, autoVidoNextHand: false, handsSinceReset: newHandsSinceReset });
-  gameBeforeVido = null;
+  vidoStack = [];
   const uvBtn = document.getElementById("undoVidoBtn");
   if (uvBtn) uvBtn.style.display = "none";
   goScreen("s4", id);
@@ -2347,11 +2347,11 @@ document.getElementById("nextHandBtn").addEventListener("click", ()=>{
 });
 
 document.getElementById("undoVidoBtn").addEventListener("click", ()=>{
-  if (!gameBeforeVido){ alert("Geri alınacak vido yok."); return; }
+  if (!vidoStack.length){ alert("Geri alınacak vido yok."); return; }
   if (!confirm("Son vido iptal edilsin mi?")) return;
-  fbSet(`${tablesPath()}/${currentTableId}/game`, gameBeforeVido);
-  gameBeforeVido = null;
-  document.getElementById("undoVidoBtn").style.display = "none";
+  const prev = vidoStack.pop();
+  fbSet(`${tablesPath()}/${currentTableId}/game`, prev);
+  if (!vidoStack.length) document.getElementById("undoVidoBtn").style.display = "none";
 });
 
 document.getElementById("undoHandBtn").addEventListener("click", ()=>{
