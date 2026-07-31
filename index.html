@@ -2800,8 +2800,16 @@ function renderStats(){
       if (!seriler[name]) seriler[name] = {seri:0, maxSeri:0, kaybSeri:0, maxKaybSeri:0};
       const s = seriler[name];
       const won = winSide.includes(name);
-      if (won){ s.seri++; s.kaybSeri=0; if(s.seri>s.maxSeri) s.maxSeri=s.seri; }
-      else { s.kaybSeri++; s.seri=0; if(s.kaybSeri>s.maxKaybSeri) s.maxKaybSeri=s.kaybSeri; }
+      const isKing = (name === kingA || name === kingB);
+      // Kazanma serisi: sadece kral (oynayan) olarak
+      if (isKing){
+        if (won){ s.seri++; s.kaybSeri=0; if(s.seri>s.maxSeri) s.maxSeri=s.seri; }
+        else { s.kaybSeri++; s.seri=0; if(s.kaybSeri>s.maxKaybSeri) s.maxKaybSeri=s.kaybSeri; }
+      } else {
+        // Ortak: sadece kaybetme serisi sayılır
+        if (!won){ s.kaybSeri++; if(s.kaybSeri>s.maxKaybSeri) s.maxKaybSeri=s.kaybSeri; }
+        else { s.kaybSeri=0; }
+      }
     });
   });
   Object.entries(seriler).forEach(([name,s])=>{
