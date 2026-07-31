@@ -2743,12 +2743,11 @@ function renderStats(){
   rows.forEach(h=>{
     const sideA = Array.isArray(h.sideA) ? h.sideA : [];
     const sideB = Array.isArray(h.sideB) ? h.sideB : [];
-    const winSide = h.winner === "A" ? effectiveSideA : effectiveSideB;
-    const loseSide = h.winner === "A" ? effectiveSideB : effectiveSideA;
-    // sideA/sideB yoksa results'tan oyuncu isimlerini çıkar
     const resultNames = Object.keys(h.results||{});
     const effectiveSideA = sideA.length ? sideA : (h.winner==="A" ? resultNames.filter(n=>(h.results[n]?.total||0)>0) : resultNames.filter(n=>(h.results[n]?.total||0)<0));
     const effectiveSideB = sideB.length ? sideB : (h.winner==="B" ? resultNames.filter(n=>(h.results[n]?.total||0)>0) : resultNames.filter(n=>(h.results[n]?.total||0)<0));
+    const winSide = h.winner === "A" ? effectiveSideA : effectiveSideB;
+    const loseSide = h.winner === "A" ? effectiveSideB : effectiveSideA;
     const allPlayers = [...new Set([...effectiveSideA, ...effectiveSideB, ...resultNames])];
     const kingA = h.kingA || effectiveSideA[0] || null;
     const kingB = h.kingB || effectiveSideB[0] || null;
