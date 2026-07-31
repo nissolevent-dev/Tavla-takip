@@ -2743,11 +2743,15 @@ function renderStats(){
   rows.forEach(h=>{
     const sideA = Array.isArray(h.sideA) ? h.sideA : [];
     const sideB = Array.isArray(h.sideB) ? h.sideB : [];
-    const winSide = h.winner === "A" ? sideA : sideB;
-    const loseSide = h.winner === "A" ? sideB : sideA;
-    const allPlayers = [...sideA, ...sideB];
-    const kingA = h.kingA || sideA[0] || null;
-    const kingB = h.kingB || sideB[0] || null;
+    const winSide = h.winner === "A" ? effectiveSideA : effectiveSideB;
+    const loseSide = h.winner === "A" ? effectiveSideB : effectiveSideA;
+    // sideA/sideB yoksa results'tan oyuncu isimlerini çıkar
+    const resultNames = Object.keys(h.results||{});
+    const effectiveSideA = sideA.length ? sideA : (h.winner==="A" ? resultNames.filter(n=>(h.results[n]?.total||0)>0) : resultNames.filter(n=>(h.results[n]?.total||0)<0));
+    const effectiveSideB = sideB.length ? sideB : (h.winner==="B" ? resultNames.filter(n=>(h.results[n]?.total||0)>0) : resultNames.filter(n=>(h.results[n]?.total||0)<0));
+    const allPlayers = [...new Set([...effectiveSideA, ...effectiveSideB, ...resultNames])];
+    const kingA = h.kingA || effectiveSideA[0] || null;
+    const kingB = h.kingB || effectiveSideB[0] || null;
 
     allPlayers.forEach(name=>{
       const p = getP(name);
@@ -2794,8 +2798,13 @@ function renderStats(){
   sortedRows.forEach(h=>{
     const sideA = Array.isArray(h.sideA) ? h.sideA : [];
     const sideB = Array.isArray(h.sideB) ? h.sideB : [];
-    const winSide = h.winner === "A" ? sideA : sideB;
-    const allPlayers = [...sideA, ...sideB];
+    const rN = Object.keys(h.results||{});
+    const eSA = sideA.length ? sideA : (h.winner==="A" ? rN.filter(n=>(h.results[n]?.total||0)>0) : rN.filter(n=>(h.results[n]?.total||0)<0));
+    const eSB = sideB.length ? sideB : (h.winner==="B" ? rN.filter(n=>(h.results[n]?.total||0)>0) : rN.filter(n=>(h.results[n]?.total||0)<0));
+    const winSide = h.winner === "A" ? eSA : eSB;
+    const allPlayers = [...new Set([...eSA, ...eSB, ...rN])];
+    const kingA = h.kingA || eSA[0] || null;
+    const kingB = h.kingB || eSB[0] || null;
     allPlayers.forEach(name=>{
       if (!seriler[name]) seriler[name] = {seri:0, maxSeri:0, kaybSeri:0, maxKaybSeri:0};
       const s = seriler[name];
