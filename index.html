@@ -2819,12 +2819,12 @@ function renderStats(){
     <div class="card">
       <h2>${escapeHtml(name)}</h2>
       ${row("Kazanma oranı", pct(p.kazandigi, p.totalEls) + ` (${p.kazandigi}/${p.totalEls})`)}
-      ${p.kralOynadi > 0 ? row("Kral olarak", pct(p.kralKazandi, p.kralOynadi) + ` (${p.kralKazandi}/${p.kralOynadi})`) : ""}
-      ${p.yardimciOynadi > 0 ? row("Yardımcı olarak", pct(p.yardimciKazandi, p.yardimciOynadi) + ` (${p.yardimciKazandi}/${p.yardimciOynadi})`) : ""}
+      ${p.kralOynadi > 0 ? row("Oynayan olarak", pct(p.kralKazandi, p.kralOynadi) + ` (${p.kralKazandi}/${p.kralOynadi})`) : ""}
+      ${p.yardimciOynadi > 0 ? row("Dışardan ortak olarak", pct(p.yardimciKazandi, p.yardimciOynadi) + ` (${p.yardimciKazandi}/${p.yardimciOynadi})`) : ""}
       ${row("Mars yaptı / yedi", `${p.marsYapti} / ${p.marsYedi}`)}
       ${row("Vido çekti", p.vidoCekti)}
       ${row("Vido gördü / görmedi", `${p.gordu} / ${p.gormedi}`)}
-      ${p.autoVidoOynadi > 0 ? row("Oto vido ellerinde", pct(p.autoVidoKazandi, p.autoVidoOynadi) + ` (${p.autoVidoKazandi}/${p.autoVidoOynadi})`) : ""}
+      ${p.autoVidoOynadi > 0 ? row("Sanvoir ellerinde", pct(p.autoVidoKazandi, p.autoVidoOynadi) + ` (${p.autoVidoKazandi}/${p.autoVidoOynadi})`) : ""}
       ${row("En uzun kazanma serisi", p.maxSeri)}
       ${row("En uzun kaybetme serisi", p.maxKaybSeri)}
       ${row("En çok kazanılan el", "+" + p.enCokKazanilan.toFixed(0) + " ₺")}
