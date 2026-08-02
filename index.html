@@ -568,6 +568,7 @@ let lastTotalsShareData = null;
 let pendingPayments = { payers: [], receivers: [] };
 
 /* ===================== FIREBASE SYNC ===================== */
+let _firstLoad = true;
 ROOT.on("value", snap => {
   const val = snap.val() || {};
   STATE.players = val.players || {};
@@ -578,6 +579,11 @@ ROOT.on("value", snap => {
   STATE.activeSessionId = val.activeSessionId || null;
   const activeSession = STATE.activeSessionId ? STATE.sessions[STATE.activeSessionId] : null;
   STATE.tables = activeSession ? (activeSession.tables || {}) : {};
+  if (_firstLoad){
+    _firstLoad = false;
+    const _live = Object.entries(STATE.tables||{}).find(([,t])=>t.game&&!t.game.finished);
+    if (_live){ goScreen("s4", _live[0]); return; }
+  }
   renderAll();
 });
 
@@ -1304,6 +1310,13 @@ async function shareBalanceCard(title, totals, payments){
     console.error(e);
     alert("Paylaşım sırasında bir hata oluştu: " + e.message);
   }
+}
+
+function renderCloseSessionScreen(){
+  const s = STATE.sessions[STATE.activeSessionId];
+  if (!s){ goScreen("s2"); return; }
+  const totals = computeSessionHandTotals(s);
+  renderBalanceList(document.getElementById("closeSessionTotals"), totals);
 }
 
 document.getElementById("closeSessionBtn2").addEventListener("click", ()=>{
@@ -2803,10 +2816,7 @@ function escapeHtml(s){
 }
 
 /* Uygulama açılışta Masalar sekmesinde başlasın. */
-// İlk açılışta canlı el varsa direkt s4'e git
-const _initLive = Object.entries(STATE.tables||{}).find(([tid,t])=>t.game&&!t.game.finished);
-if (_initLive) goScreen("s4", _initLive[0]);
-else goScreen("s2");
+goScreen("s2");
 </script>
 </body>
 </html>
