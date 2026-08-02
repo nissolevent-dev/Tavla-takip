@@ -444,10 +444,7 @@
       </div>
       <div id="paymentBalanceNote" style="margin-top:10px;font-size:12px;color:#888;text-align:center;"></div>
     </div>
-    <div class="card" id="paymentsCard" style="display:none;">
-      <h2>Yapılan Ödemeler</h2>
-      <div id="paymentsListView"></div>
-    </div>
+
     <div class="card">
       <h2>El Geçmişi</h2>
       <div id="allHistoryWrap"></div>
@@ -478,25 +475,7 @@
       <div class="small-note">Bu oturumdaki el sonuçlarına göre kim kime ne kadar borçlu.</div>
       <div id="closeSessionTotals" style="margin-top:8px;"></div>
     </div>
-    <div class="card">
-      <h2>Yapılan Ödemeyi Girin</h2>
-      <div class="small-note">Gerçekte kim kime ne kadar ödedi? Birden fazla ödeme ekleyebilirsiniz.</div>
-      <label>Ödeyen</label>
-      <select id="paymentFromSelect"></select>
-      <label>Alan</label>
-      <select id="paymentToSelect"></select>
-      <label>Tutar (₺)</label>
-      <div class="row">
-        <input type="number" id="paymentAmountInput" placeholder="Örn: 50">
-        <button class="btn-soft" id="addPaymentBtn" style="flex:0 0 70px;">Ekle</button>
-      </div>
-      <div id="paymentListWrap" style="margin-top:10px;"></div>
-    </div>
-    <div class="card">
-      <h2>Kalan Bakiye (Ödemeler Sonrası)</h2>
-      <div id="remainingBalancePreview"></div>
-      <button class="btn-soft btn-block" id="shareWhatsappCloseBtn" style="margin-top:10px;">📲 Görsel Olarak Paylaş</button>
-    </div>
+
     <button class="btn-main" id="confirmCloseSessionBtn">Oturumu Kapat</button>
   </div>
 
@@ -1332,65 +1311,8 @@ document.getElementById("closeSessionBtn2").addEventListener("click", ()=>{
   pendingPayments = { payers: [], receivers: [] };
   goScreen("s7");
 });
+;
 
-document.getElementById("shareWhatsappCloseBtn").addEventListener("click", ()=>{
-  const s = STATE.sessions[STATE.activeSessionId];
-  if (!s) return;
-  const totals = computeSessionHandTotals(s);
-  applyPaymentsToTotals(totals, pendingPayments);
-  shareBalanceCard(s.name, totals, pendingPayments);
-});
-
-function renderCloseSessionScreen(){
-  const s = STATE.sessions[STATE.activeSessionId];
-  if (!s){ goScreen("s2"); return; }
-  const names = Object.keys(s.activePlayers||{});
-
-  const totals = computeSessionHandTotals(s);
-  renderBalanceList(document.getElementById("closeSessionTotals"), totals);
-
-  const fromSel = document.getElementById("paymentFromSelect");
-  const toSel = document.getElementById("paymentToSelect");
-  const optHtml = names.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
-  if (fromSel.innerHTML !== optHtml) fromSel.innerHTML = optHtml;
-  if (toSel.innerHTML !== optHtml) toSel.innerHTML = optHtml;
-
-  const legacyList = (pendingPayments && pendingPayments._legacy) || [];
-  const listWrap = document.getElementById("paymentListWrap");
-  listWrap.innerHTML = legacyList.length ? legacyList.map((p,i)=>`
-    <div class="result-line">
-      <span>${escapeHtml(p.from)} → ${escapeHtml(p.to)}</span>
-      <span class="amt pos" style="display:flex;align-items:center;gap:8px;">
-        ${p.amount.toFixed(2)} ₺
-        <button class="btn-danger btn-sm" data-idx="${i}">Sil</button>
-      </span>
-    </div>
-  `).join("") : `<div class="small-note">Henüz ödeme eklenmedi.</div>`;
-  listWrap.querySelectorAll("button[data-idx]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      legacyList.splice(parseInt(btn.getAttribute("data-idx")), 1);
-      renderCloseSessionScreen();
-    });
-  });
-
-  const remaining = applyPaymentsToTotals(Object.assign({}, totals), legacyList);
-  renderBalanceList(document.getElementById("remainingBalancePreview"), remaining);
-}
-
-document.getElementById("addPaymentBtn").addEventListener("click", ()=>{
-  const from = document.getElementById("paymentFromSelect").value;
-  const to = document.getElementById("paymentToSelect").value;
-  const amount = parseFloat(document.getElementById("paymentAmountInput").value);
-  if (!from || !to || from === to){ alert("Ödeyen ve alan farklı kişiler olmalı."); return; }
-  if (!amount || amount <= 0){ alert("Geçerli bir tutar girin."); return; }
-  // Eski format: {from, to, amount} — s7 ekranı hâlâ kullanıyor
-  if (!Array.isArray(pendingPayments)) pendingPayments = { payers: [], receivers: [] };
-  // s7'de geçici olarak eski listeye ekle (oturum kapatırken array olarak kaydedilecek)
-  if (!pendingPayments._legacy) pendingPayments._legacy = [];
-  pendingPayments._legacy.push({ from, to, amount });
-  document.getElementById("paymentAmountInput").value = "";
-  renderCloseSessionScreen();
-});
 
 document.getElementById("confirmCloseSessionBtn").addEventListener("click", ()=>{
   const sid = STATE.activeSessionId;
@@ -2474,8 +2396,6 @@ function renderTotalsScreen(){
   });
 
   const scopeNote = document.getElementById("totalsScopeNote");
-  const paymentsCard = document.getElementById("paymentsCard");
-  const paymentsListView = document.getElementById("paymentsListView");
 
   if (totalsSelectedSession === "ALL"){
     Object.entries(STATE.startingBalances||{}).forEach(([name,amt])=>{
@@ -2489,23 +2409,16 @@ function renderTotalsScreen(){
       }
     });
     scopeNote.textContent = "Başlangıç bakiyeleri ve kapanmış oturumların ödemeleri dahil edilmiştir.";
-    paymentsCard.style.display = "none";
   } else {
     const s = STATE.sessions[totalsSelectedSession];
     if (s && s.closed){
       scopeNote.textContent = `Bu oturum kapatılmış (${new Date(s.closedAt||0).toLocaleDateString("tr-TR")}). Aşağıdaki tutar, yapılan ödemeler sonrası kalan bakiyedir.`;
       applyPaymentsToTotals(totals, s.payments);
       if (s.payments && s.payments.length){
-        paymentsCard.style.display = "block";
-        paymentsListView.innerHTML = s.payments.map(p=>
-          `<div class="result-line"><span>${escapeHtml(p.from)} → ${escapeHtml(p.to)}</span><span class="amt pos">${p.amount.toFixed(2)} ₺</span></div>`
-        ).join("");
-      } else {
-        paymentsCard.style.display = "none";
+} else {
       }
     } else {
       scopeNote.textContent = "Bu oturumun el sonuçlarına göre hesaplanan toplam (başlangıç bakiyesi dahil değildir).";
-      paymentsCard.style.display = "none";
     }
   }
 
@@ -2890,7 +2803,10 @@ function escapeHtml(s){
 }
 
 /* Uygulama açılışta Masalar sekmesinde başlasın. */
-goScreen("s2");
+// İlk açılışta canlı el varsa direkt s4'e git
+const _initLive = Object.entries(STATE.tables||{}).find(([tid,t])=>t.game&&!t.game.finished);
+if (_initLive) goScreen("s4", _initLive[0]);
+else goScreen("s2");
 </script>
 </body>
 </html>
