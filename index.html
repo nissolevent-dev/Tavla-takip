@@ -685,11 +685,16 @@ function buildInitialGame(seated, partners){
 
 /* ===================== NAV ===================== */
 document.querySelectorAll("[data-go]").forEach(el=>{
-  el.addEventListener("click", ()=> goScreen(el.getAttribute("data-go")));
+  el.addEventListener("click", ()=> {
+    const target = el.getAttribute("data-go");
+    // back-link butonları force=true ile gider (canlı el yönlendirmesini atlar)
+    const force = el.classList.contains("back-link");
+    goScreen(target, undefined, force);
+  });
 });
-function goScreen(id, tableId){
-  // Masalar sekmesine gidilince canlı el varsa direkt ona dön
-  if (id === "s2" && tableId === undefined){
+function goScreen(id, tableId, force){
+  // Masalar sekmesine gidilince canlı el varsa direkt ona dön (force=true ise atla)
+  if (id === "s2" && tableId === undefined && !force){
     const tables = STATE.tables || {};
     const liveTable = Object.entries(tables).find(([tid, t])=> t.game && !t.game.finished);
     if (liveTable){
