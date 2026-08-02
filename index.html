@@ -688,6 +688,21 @@ document.querySelectorAll("[data-go]").forEach(el=>{
   el.addEventListener("click", ()=> goScreen(el.getAttribute("data-go")));
 });
 function goScreen(id, tableId){
+  // Masalar sekmesine gidilince canlı el varsa direkt ona dön
+  if (id === "s2" && tableId === undefined){
+    const tables = STATE.tables || {};
+    const liveTable = Object.entries(tables).find(([tid, t])=> t.game && !t.game.finished);
+    if (liveTable){
+      currentScreen = "s4";
+      currentTableId = liveTable[0];
+      document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+      document.getElementById("s4").classList.add("active");
+      document.querySelectorAll(".tabbar button").forEach(b=>b.classList.remove("on"));
+      document.getElementById("tabTables").classList.add("on");
+      renderAll();
+      return;
+    }
+  }
   currentScreen = id;
   if (tableId !== undefined) currentTableId = tableId;
   document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
