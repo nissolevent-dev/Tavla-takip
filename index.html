@@ -1636,64 +1636,51 @@ function advanceRotation(t, winnerSide){
 function rotationFromRanking_2v2(ranking){
   // ranking: [R1(en büyük), R2, R3, R4(en küçük)]
   // İlk el: A=R1+R3, B=R4+R2
-  // Kural: ortaklar çapraz (R1↔R3, R2↔R4), oturanlar zar sırasına göre
-  const king = ranking[0];           // R1 kral
-  const kingHelper = ranking[2];     // R3 onun ortağı
-  const challenger = ranking[3];     // R4 challenger (diğer ikilinin en küçüğü)
-  const challengerHelper = ranking[1]; // R2 onun ortağı
+  // state: king=R1, loser=R3, queue=[R4,R2]
+  // fullOrder = [loser, queue[0], queue[1]]
+  const king = ranking[0];   // R1
+  const loser = ranking[2];  // R3 (ilk elde helper)
+  const q0 = ranking[3];     // R4 (challenger)
+  const q1 = ranking[1];     // R2 (challenger helper)
   return {
-    seated: { A: king, B: challenger },
-    partners: { A: { [kingHelper]: true }, B: { [challengerHelper]: true } },
-    rotation: {
-      king,
-      fullOrder: [kingHelper, challenger, challengerHelper],
-      format: "2v2",
-      initialRanking: ranking   // zar sırası — sonraki ellerde kullanılır
-    },
+    seated: { A: king, B: q0 },
+    partners: { A: { [loser]: true }, B: { [q1]: true } },
+    rotation: { king, fullOrder: [loser, q0, q1], format: "2v2" },
     usesKingHelper: true,
     format: "2v2"
   };
 }
 
 function advanceRotation_2v2(t, winnerSide){
+  // fullOrder = [loser(helper), queue[0](challenger), queue[1](chalHelper)]
+  // Kural: kaybeden oturan HER ZAMAN bir sonraki el helper olur
+  // A kazandı: new loser=queue[0], new queue=[queue[1], loser_eski]
+  // B kazandı: new king=queue[0], new loser=king, new queue=[queue[1], loser_eski]
   const king = t.seated.A;
-  const challenger = t.seated.B;
-  const kingHelper = Object.keys((t.partners&&t.partners.A)||{})[0] || null;
-  const challengerHelper = Object.keys((t.partners&&t.partners.B)||{})[0] || null;
+  const rawFO = t.rotation && t.rotation.fullOrder;
+  const fo = Array.isArray(rawFO) ? rawFO
+    : (rawFO && typeof rawFO === "object")
+      ? Object.keys(rawFO).sort((a,b)=>+a-+b).map(k=>rawFO[k])
+      : [];
+  const loser = fo[0];
+  const q0 = fo[1];
+  const q1 = fo[2];
 
-  // Zar sırası: initialRanking'den al (rotation içinde saklandı)
-  const ranking = (t.rotation && t.rotation.initialRanking) || [king, challengerHelper, kingHelper, challenger];
-  const rankOf = name => ranking.indexOf(name);
-
-  let newKing, newKingHelper, newChallenger, newChallengerHelper;
   if (winnerSide === "A"){
-    newKing = king;
-    newKingHelper = challenger;   // kaybeden oturan → kazananın ortağı
-    // Diğer ikisi: kingHelper ve challengerHelper — zar sırasında büyük oturur
-    const others = [kingHelper, challengerHelper].sort((a,b) => rankOf(a) - rankOf(b));
-    newChallenger = others[0];    // zar sırasında büyük → masaya oturur
-    newChallengerHelper = others[1];
+    // B oturanı (q0) kaybetti → yeni helper
+    return { king, fullOrder: [q0, q1, loser], format: "2v2" };
   } else {
-    newKing = challenger;
-    newKingHelper = king;         // kaybeden oturan → kazananın ortağı
-    const others = [kingHelper, challengerHelper].sort((a,b) => rankOf(a) - rankOf(b));
-    newChallenger = others[0];
-    newChallengerHelper = others[1];
+    // king kaybetti → yeni helper; q0 yeni kral
+    return { king: q0, fullOrder: [king, q1, loser], format: "2v2" };
   }
-
-  // fullOrder: [newKingHelper, newChallenger, newChallengerHelper]
-  // seat2v2FromRotation: king=newKing, fullOrder[0]=kingHelper, fullOrder[1]=challenger, fullOrder[2]=challengerHelper
-  const fullOrder = [newKingHelper, newChallenger, newChallengerHelper];
-  return { king: newKing, fullOrder, format: "2v2", initialRanking: ranking };
 }
 
 function seat2v2FromRotation(king, fullOrder){
-  // fullOrder: [kingHelper, challenger, challengerHelper]
-  // advanceRotation_2v2 bu sırayı garanti eder
-  const [kingHelper, challenger, challengerHelper] = fullOrder;
+  // fullOrder: [loser(helper), queue[0](challenger), queue[1](chalHelper)]
+  const [loser, q0, q1] = fullOrder;
   return {
-    seated: { A: king, B: challenger },
-    partners: { A: { [kingHelper]: true }, B: { [challengerHelper]: true } }
+    seated: { A: king, B: q0 },
+    partners: { A: { [loser]: true }, B: { [q1]: true } }
   };
 }
 
@@ -2277,7 +2264,7 @@ function finishHand(tableId, winnerSide, g, isMars){
       previousSnapshot,
       autoVidoNextHand,
       handsSinceReset,
-      rotation: { king: next.king, fullOrder: next.fullOrder, format: t.format || "1v3", initialRanking: next.initialRanking || (t.rotation && t.rotation.initialRanking) || null }
+      rotation: { king: next.king, fullOrder: next.fullOrder, format: t.format || "1v3" }
     });
   } else {
     fbUpdate(`${tablesPath()}/${tableId}`, { game: g, previousSnapshot, autoVidoNextHand, handsSinceReset });
