@@ -1635,12 +1635,21 @@ function advanceRotation(t, winnerSide){
    Her zaman 2'ye 2 formatında kalır. */
 function rotationFromRanking_2v2(ranking){
   // ranking: [R1(en büyük), R2, R3, R4(en küçük)]
-  // İlk el: A = R1+R3, B = R4+R2
-  // fullOrder: [R1, R3, R2, R4] — R1 kral, R3 onun ortağı, sonra R2, R4
+  // İlk el: A=R1+R3, B=R4+R2
+  // Kural: ortaklar çapraz (R1↔R3, R2↔R4), oturanlar zar sırasına göre
+  const king = ranking[0];           // R1 kral
+  const kingHelper = ranking[2];     // R3 onun ortağı
+  const challenger = ranking[3];     // R4 challenger (diğer ikilinin en küçüğü)
+  const challengerHelper = ranking[1]; // R2 onun ortağı
   return {
-    seated: { A: ranking[0], B: ranking[3] },
-    partners: { A: { [ranking[2]]: true }, B: { [ranking[1]]: true } },
-    rotation: { king: ranking[0], fullOrder: [ranking[2], ranking[1], ranking[3]], format: "2v2" },
+    seated: { A: king, B: challenger },
+    partners: { A: { [kingHelper]: true }, B: { [challengerHelper]: true } },
+    rotation: {
+      king,
+      fullOrder: [kingHelper, challenger, challengerHelper],
+      format: "2v2",
+      initialRanking: ranking   // zar sırası — sonraki ellerde kullanılır
+    },
     usesKingHelper: true,
     format: "2v2"
   };
@@ -1652,45 +1661,39 @@ function advanceRotation_2v2(t, winnerSide){
   const kingHelper = Object.keys((t.partners&&t.partners.A)||{})[0] || null;
   const challengerHelper = Object.keys((t.partners&&t.partners.B)||{})[0] || null;
 
-  let newKing, seatedLoser, loserHelper, winnerHelper;
+  // Zar sırası: initialRanking'den al (rotation içinde saklandı)
+  const ranking = (t.rotation && t.rotation.initialRanking) || [king, challengerHelper, kingHelper, challenger];
+  const rankOf = name => ranking.indexOf(name);
+
+  let newKing, newKingHelper, newChallenger, newChallengerHelper;
   if (winnerSide === "A"){
     newKing = king;
-    winnerHelper = kingHelper;     // kazanan ortağı kalır
-    seatedLoser = challenger;       // rakip oturan yeni yardımcı olur
-    loserHelper = challengerHelper; // rakip ortağı kuyruğa gider
+    newKingHelper = challenger;   // kaybeden oturan → kazananın ortağı
+    // Diğer ikisi: kingHelper ve challengerHelper — zar sırasında büyük oturur
+    const others = [kingHelper, challengerHelper].sort((a,b) => rankOf(a) - rankOf(b));
+    newChallenger = others[0];    // zar sırasında büyük → masaya oturur
+    newChallengerHelper = others[1];
   } else {
     newKing = challenger;
-    winnerHelper = challengerHelper;
-    seatedLoser = king;
-    loserHelper = kingHelper;
+    newKingHelper = king;         // kaybeden oturan → kazananın ortağı
+    const others = [kingHelper, challengerHelper].sort((a,b) => rankOf(a) - rankOf(b));
+    newChallenger = others[0];
+    newChallengerHelper = others[1];
   }
 
-  // fullOrder: yeni Kral'ın ortağı (kazanan ortak), ardından kuyruktan
-  // gelecek kişi/kişiler, en sonda kaybeden (yeni Kral'ın ortağı olacak).
-  // kuyruktan gelecek yeni rakip = fullOrder'ın başındaki kişi (startGameForTable'da).
-  const fullOrder = [];
-  if (winnerHelper) fullOrder.push(winnerHelper); // kazanan ortağı (bir sonraki elde de Kral'ın ortağı)
-  if (loserHelper) fullOrder.push(loserHelper);   // kuyruktan gelecek yeni rakibin ortağı
-  fullOrder.push(seatedLoser);                     // kaybeden = yeni Kral'ın yardımcısı (EN SONDA)
-
-  return { king: newKing, fullOrder, format: "2v2" };
+  // fullOrder: [newKingHelper, newChallenger, newChallengerHelper]
+  // seat2v2FromRotation: king=newKing, fullOrder[0]=kingHelper, fullOrder[1]=challenger, fullOrder[2]=challengerHelper
+  const fullOrder = [newKingHelper, newChallenger, newChallengerHelper];
+  return { king: newKing, fullOrder, format: "2v2", initialRanking: ranking };
 }
 
 function seat2v2FromRotation(king, fullOrder){
-  // fullOrder: [kazanan ortak, rakibin ortağı, kaybeden (yeni kral yardımcısı)]
-  // Ama startGameForTable'da fullOrder [king, ...rest] şeklinde geliyor.
-  // rest = [kazananOrtak, rakipOrtağı, kaybeden]
-  // Yeni el: A = king + rest[2](kaybeden=yardımcı), B = rest[0](kuyruk=rakip) + rest[1]
-  const [kingHelper, challengerHelper, newChallenger] = fullOrder;
-  // Aslında fullOrder = [kazananOrtak, loserHelper, seatedLoser]
-  // Sıradaki rakip (B oturan) = loserHelper'dan sonra kuyruktan gelmeli
-  // Ama bizim 2v2 rotasyonumuzda:
-  // fullOrder[0] = winnerHelper (kral ortağı kalır)
-  // fullOrder[1] = loserHelper (yeni rakibin ortağı)
-  // fullOrder[2] = seatedLoser (yeni kral yardımcısı)
+  // fullOrder: [kingHelper, challenger, challengerHelper]
+  // advanceRotation_2v2 bu sırayı garanti eder
+  const [kingHelper, challenger, challengerHelper] = fullOrder;
   return {
-    seated: { A: king, B: fullOrder[1] },
-    partners: { A: { [fullOrder[2]]: true }, B: { [fullOrder[0]]: true } }
+    seated: { A: king, B: challenger },
+    partners: { A: { [kingHelper]: true }, B: { [challengerHelper]: true } }
   };
 }
 
@@ -2274,7 +2277,7 @@ function finishHand(tableId, winnerSide, g, isMars){
       previousSnapshot,
       autoVidoNextHand,
       handsSinceReset,
-      rotation: { king: next.king, fullOrder: next.fullOrder, format: t.format || "1v3" }
+      rotation: { king: next.king, fullOrder: next.fullOrder, format: t.format || "1v3", initialRanking: next.initialRanking || (t.rotation && t.rotation.initialRanking) || null }
     });
   } else {
     fbUpdate(`${tablesPath()}/${tableId}`, { game: g, previousSnapshot, autoVidoNextHand, handsSinceReset });
