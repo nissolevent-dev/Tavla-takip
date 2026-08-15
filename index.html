@@ -2213,6 +2213,7 @@ function finishHand(tableId, winnerSide, g, isMars){
     handsSinceReset: t.handsSinceReset,
     autoVidoNextHand: !!t.autoVidoNextHand,
     historyKey: historyRef ? historyRef.key : null,
+    vidoStack: JSON.stringify(vidoStack||[]),
   };
 
   // Otomatik vido tetikleyici: mars veya oturan biri "Görmedi" demiş mi?
@@ -2317,6 +2318,10 @@ document.getElementById("undoFinishedHandBtn").addEventListener("click", ()=>{
     handsSinceReset: snap.handsSinceReset,
     autoVidoNextHand: snap.autoVidoNextHand || false
   });
+  // vidoStack'i restore et
+  try { vidoStack = snap.vidoStack ? JSON.parse(snap.vidoStack) : []; } catch(e){ vidoStack = []; }
+  const uvBtnR = document.getElementById("undoVidoBtn");
+  if (uvBtnR) uvBtnR.style.display = vidoStack.length ? "inline-block" : "none";
   document.getElementById("undoFinishedHandBtn").style.display = "none";
 });
 
@@ -2341,6 +2346,9 @@ document.getElementById("undoAutoFinishBtn").addEventListener("click", ()=>{
       autoVidoNextHand: snap.autoVidoNextHand || false
     });
   }
+  try { vidoStack = snap.vidoStack ? JSON.parse(snap.vidoStack) : []; } catch(e){ vidoStack = []; }
+  const uvBtnA = document.getElementById("undoVidoBtn");
+  if (uvBtnA) uvBtnA.style.display = vidoStack.length ? "inline-block" : "none";
   document.getElementById("undoAutoFinishBtn").style.display = "none";
 });
 
