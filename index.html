@@ -374,6 +374,7 @@
       <div id="finishedPanel" style="display:none;">
         <h2 style="margin-top:14px;">El Sonucu</h2>
         <div id="finishedResults"></div>
+        <button class="btn-soft btn-block" id="undoAutoFinishBtn" style="display:none;margin-bottom:8px;">↩ Geri Al (Vido ekranına dön)</button>
         <button class="btn-main" id="nextHandBtn">Yeni El Başlat</button>
       </div>
     </div>
@@ -1824,6 +1825,8 @@ function startGameForTable(id, autoVidoCount){
   const newHandsSinceReset = isAutoVidoHand ? 0 : (t.handsSinceReset !== undefined ? t.handsSinceReset : 1);
   fbUpdate(`${tablesPath()}/${id}`, { game, autoVidoNextHand: false, handsSinceReset: newHandsSinceReset });
   vidoStack = [];
+  const uafBtn = document.getElementById("undoAutoFinishBtn");
+  if (uafBtn) uafBtn.style.display = "none";
   const uvBtn = document.getElementById("undoVidoBtn");
   if (uvBtn) uvBtn.style.display = "none";
   goScreen("s4", id);
@@ -2079,6 +2082,9 @@ document.getElementById("confirmVidoBtn").addEventListener("click", ()=>{
 
     if (handJustFinished){
       finishHand(currentTableId, finishWinnerSide, g);
+      // Otomatik kapandı — geri al butonu göster
+      const uafBtn = document.getElementById("undoAutoFinishBtn");
+      if (uafBtn) uafBtn.style.display = "block";
     } else {
       fbSet(`${tablesPath()}/${currentTableId}/game`, g);
     }
@@ -2286,6 +2292,30 @@ function renderFinishedResults(t){
       </div>`;
   }).join("");
 }
+
+document.getElementById("undoAutoFinishBtn").addEventListener("click", ()=>{
+  if (!confirm("El geri alınsın ve vido ekranına dönülsün mü?")) return;
+  const t = STATE.tables[currentTableId];
+  if (!t || !t.game) return;
+  // game'i bitirilmemiş hale getir
+  const snap = t.previousSnapshot;
+  if (snap){
+    const gameToRestore = snap.gameJson ? JSON.parse(snap.gameJson) : snap.game;
+    fbSet(`${tablesPath()}/${currentTableId}/game`, gameToRestore);
+    if (snap.historyKey){
+      fbRemove(`sessions/${STATE.activeSessionId}/tables/${currentTableId}/history/${snap.historyKey}`);
+    }
+    fbUpdate(`${tablesPath()}/${currentTableId}`, {
+      seated: snap.seated,
+      partners: snap.partners,
+      rotation: snap.rotation,
+      previousSnapshot: null,
+      handsSinceReset: snap.handsSinceReset,
+      autoVidoNextHand: snap.autoVidoNextHand || false
+    });
+  }
+  document.getElementById("undoAutoFinishBtn").style.display = "none";
+});
 
 document.getElementById("nextHandBtn").addEventListener("click", ()=>{
   try{
