@@ -626,19 +626,18 @@ function getPairCell(t, name1, name2){
   return { aName, bName, p: (t.game.pairs[aName]||{})[bName] };
 }
 function callableTargets(t, name){
-  // Kapalı olmayan çiftleri döndür.
-  // Aynı tur içinde aynı kişinin tekrar seçilmesi UI'da selectedVidoCallers ile engelleniyor.
+  // blockedCaller !== name: bu tur içinde aynı kişi aynı hedefe tekrar çekemez
   const side = sideOf(t, name);
   const g = t.game;
   const targets = [];
   if (side === "A"){
     Object.entries(g.pairs[name]||{}).forEach(([b,p])=>{
-      if (!p.closed) targets.push(b);
+      if (!p.closed && p.blockedCaller !== name) targets.push(b);
     });
   } else if (side === "B"){
     sideNames(t,"A").forEach(a=>{
       const p = (g.pairs[a]||{})[name];
-      if (p && !p.closed) targets.push(a);
+      if (p && !p.closed && p.blockedCaller !== name) targets.push(a);
     });
   }
   return targets;
@@ -2093,6 +2092,8 @@ document.getElementById("confirmVidoBtn").addEventListener("click", ()=>{
       if (uafBtn) uafBtn.style.display = "block";
     } else {
       fbSet(`${tablesPath()}/${currentTableId}/game`, g);
+      // Local state'i hemen güncelle - Firebase callback'i beklemeden blockedCaller korunsun
+      if (STATE.tables[currentTableId]) STATE.tables[currentTableId].game = g;
     }
     // Vido geri al butonu — bir önceki game state'i sakla
     document.getElementById("undoVidoBtn").style.display = "inline-block";
