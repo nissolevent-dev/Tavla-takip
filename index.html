@@ -1950,6 +1950,10 @@ document.getElementById("vidoCalledBtn").addEventListener("click", ()=>{
   if (!t || !t.game) return;
   // Vido öncesi game'i stack'e ekle (geri al için)
   vidoStack.push(JSON.parse(JSON.stringify(t.game)));
+  // Önceki turdan kalan blockedCaller'ları sıfırla (stack'e ekledikten sonra)
+  Object.values(t.game.pairs||{}).forEach(oppMap=>{
+    Object.values(oppMap||{}).forEach(p=>{ if(!p.closed) p.blockedCaller = null; });
+  });
   document.getElementById("undoVidoBtn").style.display = "none";
   selectedVidoCallers = [];
   selectedVidoSeers = {};
@@ -2258,11 +2262,11 @@ function finishHand(tableId, winnerSide, g, isMars){
     const vidoLog = g.vidoLog || [];
     // Kazanan oturan herhangi bir vidoyu görmemişse masadan kalkar.
     // vidoLog yerine pairs'e bak — daha güvenilir.
-    // pairs[caller][opponent].closedLoser === seatedWinner ise görmemiş demektir.
-    const winnerMissedVido = Object.values(g.pairs||{}).some(oppMap=>
-      Object.values(oppMap||{}).some(p=> p.closed && p.closedLoser === seatedWinner)
-    );
-    if (winnerMissedVido){
+    // Kural: Kazanan oturan, karşı tarafın OTURANININ vidasını görmemişse masadan kalkar.
+    // Ortakların vidasını görmemesi masadan kalkmayı gerektirmez.
+    const pairCell = (g.pairs[t.seated.A]||{})[t.seated.B];
+    const winnerMissedLoserSeated = pairCell && pairCell.closed && pairCell.closedLoser === seatedWinner;
+    if (winnerMissedLoserSeated){
       rotationWinnerSide = winnerSide === "A" ? "B" : "A";
     }
     const next = t.format === "2v2"
@@ -2323,6 +2327,7 @@ document.getElementById("undoFinishedHandBtn").addEventListener("click", ()=>{
   const uvBtnR = document.getElementById("undoVidoBtn");
   if (uvBtnR) uvBtnR.style.display = vidoStack.length ? "inline-block" : "none";
   document.getElementById("undoFinishedHandBtn").style.display = "none";
+  goScreen("s4");
 });
 
 document.getElementById("undoAutoFinishBtn").addEventListener("click", ()=>{
@@ -2350,6 +2355,7 @@ document.getElementById("undoAutoFinishBtn").addEventListener("click", ()=>{
   const uvBtnA = document.getElementById("undoVidoBtn");
   if (uvBtnA) uvBtnA.style.display = vidoStack.length ? "inline-block" : "none";
   document.getElementById("undoAutoFinishBtn").style.display = "none";
+  goScreen("s4");
 });
 
 document.getElementById("nextHandBtn").addEventListener("click", ()=>{
