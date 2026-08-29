@@ -626,17 +626,19 @@ function getPairCell(t, name1, name2){
   return { aName, bName, p: (t.game.pairs[aName]||{})[bName] };
 }
 function callableTargets(t, name){
+  // Kapalı olmayan çiftleri döndür.
+  // Aynı tur içinde aynı kişinin tekrar seçilmesi UI'da selectedVidoCallers ile engelleniyor.
   const side = sideOf(t, name);
   const g = t.game;
   const targets = [];
   if (side === "A"){
     Object.entries(g.pairs[name]||{}).forEach(([b,p])=>{
-      if (!p.closed && p.blockedCaller !== name) targets.push(b);
+      if (!p.closed) targets.push(b);
     });
   } else if (side === "B"){
     sideNames(t,"A").forEach(a=>{
       const p = (g.pairs[a]||{})[name];
-      if (p && !p.closed && p.blockedCaller !== name) targets.push(a);
+      if (p && !p.closed) targets.push(a);
     });
   }
   return targets;
@@ -1950,10 +1952,6 @@ document.getElementById("vidoCalledBtn").addEventListener("click", ()=>{
   if (!t || !t.game) return;
   // Vido öncesi game'i stack'e ekle (geri al için)
   vidoStack.push(JSON.parse(JSON.stringify(t.game)));
-  // Önceki turdan kalan blockedCaller'ları sıfırla (stack'e ekledikten sonra)
-  Object.values(t.game.pairs||{}).forEach(oppMap=>{
-    Object.values(oppMap||{}).forEach(p=>{ if(!p.closed) p.blockedCaller = null; });
-  });
   document.getElementById("undoVidoBtn").style.display = "none";
   selectedVidoCallers = [];
   selectedVidoSeers = {};
