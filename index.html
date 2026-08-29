@@ -2071,6 +2071,7 @@ document.getElementById("confirmVidoBtn").addEventListener("click", ()=>{
           p.closed = true;
           p.closedLoser = targetName;
           p.closedAtCount = oldCount;
+          p.blockedCaller = caller;
         }
         g.vidoLog.push({ caller, opponent: targetName, from: oldCount, saw });
       });
