@@ -548,6 +548,29 @@ const db = firebase.database();
 const ROOT = db.ref("tavla");
 
 
+/* ===================== LOCAL STATE ===================== */
+let STATE = {
+  players: {},
+  settings: { unitAmount: 0 },
+  startingBalances: {},
+  startingBalancesLocked: false,
+  sessions: {},
+  activeSessionId: null,
+  tables: {}
+};
+let currentScreen = "s2";
+let currentTableId = null;
+let dicePick = { ranking: [] };
+let selectedVidoCallers = [];
+let selectedVidoSeers = {};
+let vidoStack = []; // her vido öncesi game snapshot'ı // Vido geri al için snapshot
+let sessionPlayerPick = {};
+let forcingNewSession = false;
+let totalsSelectedSession = null;
+let lastTotalsShareData = null;
+let pendingPayments = { payers: [], receivers: [] };
+
+
 function fbSet(path, value){ ROOT.child(path).set(value); }
 function fbPush(path, value){ return ROOT.child(path).push(value); }
 function fbUpdate(path, value){ ROOT.child(path).update(value); }
@@ -2844,11 +2867,8 @@ goScreen("s2");
 
 ROOT.on("value", snap => {
 
-/* ===================== LOCAL STATE ===================== */
-var vidoStack = []; // her vido öncesi game snapshot'ı // Vido geri al için snapshot
-
 /* ===================== FIREBASE SYNC ===================== */
-var _firstLoad = true;
+let _firstLoad = true;
   const val = snap.val() || {};
   STATE.players = val.players || {};
   STATE.settings = val.settings || { unitAmount: 0 };
