@@ -2845,26 +2845,7 @@ goScreen("s2");
 ROOT.on("value", snap => {
 
 /* ===================== LOCAL STATE ===================== */
-var STATE = {
-  players: {},
-  settings: { unitAmount: 0 },
-  startingBalances: {},
-  startingBalancesLocked: false,
-  sessions: {},
-  activeSessionId: null,
-  tables: {}
-};
-var currentScreen = "s2";
-var currentTableId = null;
-var dicePick = { ranking: [] };
-var selectedVidoCallers = [];
-var selectedVidoSeers = {};
 var vidoStack = []; // her vido öncesi game snapshot'ı // Vido geri al için snapshot
-var sessionPlayerPick = {};
-var forcingNewSession = false;
-var totalsSelectedSession = null;
-var lastTotalsShareData = null;
-var pendingPayments = { payers: [], receivers: [] };
 
 /* ===================== FIREBASE SYNC ===================== */
 var _firstLoad = true;
