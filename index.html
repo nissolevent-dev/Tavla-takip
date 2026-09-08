@@ -550,7 +550,7 @@ const ROOT = db.ref("tavla");
 ROOT.on("value", snap => {
 
 /* ===================== LOCAL STATE ===================== */
-let STATE = {
+var STATE = {
   players: {},
   settings: { unitAmount: 0 },
   startingBalances: {},
@@ -559,20 +559,20 @@ let STATE = {
   activeSessionId: null,
   tables: {}
 };
-let currentScreen = "s2";
-let currentTableId = null;
-let dicePick = { ranking: [] };
-let selectedVidoCallers = [];
-let selectedVidoSeers = {};
-let vidoStack = []; // her vido öncesi game snapshot'ı // Vido geri al için snapshot
-let sessionPlayerPick = {};
-let forcingNewSession = false;
-let totalsSelectedSession = null;
-let lastTotalsShareData = null;
-let pendingPayments = { payers: [], receivers: [] };
+var currentScreen = "s2";
+var currentTableId = null;
+var dicePick = { ranking: [] };
+var selectedVidoCallers = [];
+var selectedVidoSeers = {};
+var vidoStack = []; // her vido öncesi game snapshot'ı // Vido geri al için snapshot
+var sessionPlayerPick = {};
+var forcingNewSession = false;
+var totalsSelectedSession = null;
+var lastTotalsShareData = null;
+var pendingPayments = { payers: [], receivers: [] };
 
 /* ===================== FIREBASE SYNC ===================== */
-let _firstLoad = true;
+var _firstLoad = true;
   const val = snap.val() || {};
   STATE.players = val.players || {};
   STATE.settings = val.settings || { unitAmount: 0 };
