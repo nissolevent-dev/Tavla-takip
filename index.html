@@ -549,7 +549,11 @@ const db = firebase.database();
 const ROOT = db.ref("tavla");
 
 // Anonim authentication — veri okuma auth tamamlandıktan sonra başlar
-firebase.auth().signInAnonymously().then(() => {
+firebase.auth().signInAnonymously().catch(e => console.error("Auth hatası:", e));
+let _rootListenerAttached = false;
+firebase.auth().onAuthStateChanged(user => {
+  if (user && !_rootListenerAttached){
+    _rootListenerAttached = true;
     ROOT.on("value", snap => {
 
 /* ===================== LOCAL STATE ===================== */
@@ -592,7 +596,8 @@ let _firstLoad = true;
   }
   renderAll();
     });
-}).catch(e => console.error("Auth hatası:", e));
+  }
+});
 
 function fbSet(path, value){ ROOT.child(path).set(value); }
 function fbPush(path, value){ return ROOT.child(path).push(value); }
