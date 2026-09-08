@@ -548,11 +548,12 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const ROOT = db.ref("tavla");
 
-// Anonim authentication — Firebase kuralları için gerekli
+// Anonim authentication — veri okuma auth tamamlandıktan sonra başlar
 firebase.auth().signInAnonymously().catch(e => console.error("Auth hatası:", e));
 firebase.auth().onAuthStateChanged(user => {
-  if (user) console.log("Firebase auth OK:", user.uid);
-});
+  if (user){
+    console.log("Firebase auth OK:", user.uid);
+    ROOT.on("value", snap => {
 
 /* ===================== LOCAL STATE ===================== */
 let STATE = {
@@ -578,7 +579,6 @@ let pendingPayments = { payers: [], receivers: [] };
 
 /* ===================== FIREBASE SYNC ===================== */
 let _firstLoad = true;
-ROOT.on("value", snap => {
   const val = snap.val() || {};
   STATE.players = val.players || {};
   STATE.settings = val.settings || { unitAmount: 0 };
@@ -594,6 +594,8 @@ ROOT.on("value", snap => {
     if (_live){ goScreen("s4", _live[0]); return; }
   }
   renderAll();
+    });
+  }
 });
 
 function fbSet(path, value){ ROOT.child(path).set(value); }
