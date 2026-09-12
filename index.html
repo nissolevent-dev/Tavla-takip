@@ -2428,22 +2428,30 @@ function renderTotalsScreen(){
     totalsSelectedSession = STATE.activeSessionId || "ALL";
   }
   // Seçili oturum değişince pendingPayments'ı yükle
-  const _sessId = totalsSelectedSession && totalsSelectedSession !== "ALL" ? totalsSelectedSession : STATE.activeSessionId;
-  if (_sessId !== window._ppLoadedFor) {
-    window._ppLoadedFor = _sessId;
+  const _sessId = totalsSelectedSession && totalsSelectedSession !== "ALL" ? totalsSelectedSession : null;
+  const _ppKey = _sessId || "ALL";
+  if (_ppKey !== window._ppLoadedFor) {
+    window._ppLoadedFor = _ppKey;
+    const toArr = v => v ? Object.values(v) : [];
+    const ppFromSess = (s) => {
+      const _pp = s && s.pendingPayments;
+      if (!_pp || typeof _pp !== 'object') return { payers: [], receivers: [] };
+      return {
+        payers:    Array.isArray(_pp.payers)    ? _pp.payers    : toArr(_pp.payers),
+        receivers: Array.isArray(_pp.receivers) ? _pp.receivers : toArr(_pp.receivers)
+      };
+    };
     if (_sessId && STATE.sessions[_sessId]){
-      const _pp = STATE.sessions[_sessId].pendingPayments;
-      if (_pp && typeof _pp === 'object'){
-        const toArr = v => v ? Object.values(v) : [];
-        pendingPayments = {
-          payers:    Array.isArray(_pp.payers)    ? _pp.payers    : toArr(_pp.payers),
-          receivers: Array.isArray(_pp.receivers) ? _pp.receivers : toArr(_pp.receivers)
-        };
-      } else {
-        pendingPayments = { payers: [], receivers: [] };
-      }
+      pendingPayments = ppFromSess(STATE.sessions[_sessId]);
     } else {
-      pendingPayments = { payers: [], receivers: [] };
+      // ALL: tüm oturumların pendingPayments'larını birleştir
+      const allPayers = [], allReceivers = [];
+      Object.values(STATE.sessions||{}).forEach(s => {
+        const pp = ppFromSess(s);
+        allPayers.push(...pp.payers);
+        allReceivers.push(...pp.receivers);
+      });
+      pendingPayments = { payers: allPayers, receivers: allReceivers };
     }
   }
   const sel = document.getElementById("totalsSessionSelect");
