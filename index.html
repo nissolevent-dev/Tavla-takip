@@ -2427,16 +2427,11 @@ function renderTotalsScreen(){
   if (totalsSelectedSession === null){
     totalsSelectedSession = STATE.activeSessionId || "ALL";
   }
-  // Seçili oturum değişince pendingPayments'ı yükle
+  // Seçili oturumun pendingPayments'ını her zaman Firebase'den oku
   const _sessId = totalsSelectedSession && totalsSelectedSession !== "ALL" ? totalsSelectedSession : STATE.activeSessionId;
-  if (_sessId && _sessId !== window._lastLoadedSessId){
-    window._lastLoadedSessId = _sessId;
-    const _pp = STATE.sessions[_sessId] ? STATE.sessions[_sessId].pendingPayments : null;
-    if (_pp && typeof _pp === 'object' && !Array.isArray(_pp)){
-      pendingPayments = _pp;
-    } else {
-      pendingPayments = { payers: [], receivers: [] };
-    }
+  if (_sessId && STATE.sessions[_sessId]){
+    const _pp = STATE.sessions[_sessId].pendingPayments;
+    pendingPayments = (_pp && typeof _pp === 'object' && !Array.isArray(_pp)) ? _pp : { payers: [], receivers: [] };
   }
   const sel = document.getElementById("totalsSessionSelect");
   const sessionEntries = Object.entries(STATE.sessions||{}).sort((a,b)=> (b[1].createdAt||0)-(a[1].createdAt||0));
@@ -2657,7 +2652,10 @@ function renderPaymentInTotals(baseTotals){
       if (type === "payer")    pendingPayments.payers.splice(idx, 1);
       if (type === "receiver") pendingPayments.receivers.splice(idx, 1);
       const _sid3 = totalsSelectedSession && totalsSelectedSession !== "ALL" ? totalsSelectedSession : STATE.activeSessionId;
-      if (_sid3) fbUpdate(`sessions/${_sid3}`, { pendingPayments });
+      if (_sid3){
+        fbUpdate(`sessions/${_sid3}`, { pendingPayments });
+        if (STATE.sessions[_sid3]) STATE.sessions[_sid3].pendingPayments = JSON.parse(JSON.stringify(pendingPayments));
+      }
       renderTotalsScreen();
     });
   });
@@ -2686,7 +2684,10 @@ document.getElementById("addPayerBtn").addEventListener("click", ()=>{
   pendingPayments.payers.push({ name, amount });
   document.getElementById("payerAmount").value = "";
   const _sid1 = totalsSelectedSession && totalsSelectedSession !== "ALL" ? totalsSelectedSession : STATE.activeSessionId;
-  if (_sid1) fbUpdate(`sessions/${_sid1}`, { pendingPayments });
+  if (_sid1){
+    fbUpdate(`sessions/${_sid1}`, { pendingPayments });
+    if (STATE.sessions[_sid1]) STATE.sessions[_sid1].pendingPayments = JSON.parse(JSON.stringify(pendingPayments));
+  }
   renderTotalsScreen();
 });
 
@@ -2698,7 +2699,10 @@ document.getElementById("addReceiverBtn").addEventListener("click", ()=>{
   pendingPayments.receivers.push({ name, amount });
   document.getElementById("receiverAmount").value = "";
   const _sid2 = totalsSelectedSession && totalsSelectedSession !== "ALL" ? totalsSelectedSession : STATE.activeSessionId;
-  if (_sid2) fbUpdate(`sessions/${_sid2}`, { pendingPayments });
+  if (_sid2){
+    fbUpdate(`sessions/${_sid2}`, { pendingPayments });
+    if (STATE.sessions[_sid2]) STATE.sessions[_sid2].pendingPayments = JSON.parse(JSON.stringify(pendingPayments));
+  }
   renderTotalsScreen();
 });
 
