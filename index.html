@@ -2203,15 +2203,18 @@ function finishHand(tableId, winnerSide, g, isMars){
   };
 
   // Otomatik vido tetikleyici: mars veya oturan biri "Görmedi" demiş mi?
-  const seatedNames = new Set([t.seated.A, t.seated.B]);
-  let seatedPlayerGormedí = false;
-  Object.entries(g.pairs||{}).forEach(([aName, oppMap])=>{
-    Object.entries(oppMap||{}).forEach(([bName, p])=>{
-      if (p.closed && seatedNames.has(p.closedLoser)){
-        seatedPlayerGormedí = true;
-      }
-    });
-  });
+  // Tetikle: oturanın vidosu oturan tarafından görülmediğinde
+  // = pairs[seatedA][seatedB] kapandı ve closedLoser oturan ise
+  const pairAB = (g.pairs[t.seated.A]||{})[t.seated.B];
+  const pairBA_loser = Object.entries(g.pairs||{}).some(([a, oppMap])=>
+    a !== t.seated.A && Object.entries(oppMap||{}).some(([b, p])=>
+      p.closed && (p.closedLoser === t.seated.A || p.closedLoser === t.seated.B) &&
+      (a === t.seated.A || a === t.seated.B || b === t.seated.A || b === t.seated.B)
+    )
+  );
+  const seatedPlayerGormedí = !!(
+    (pairAB && pairAB.closed && (pairAB.closedLoser === t.seated.A || pairAB.closedLoser === t.seated.B))
+  );
   // Sayaç mantığı: her el bittikçe +1. 3'e ulaşınca → bir sonraki el otomatik vido,
   // sayaç sıfırlanır. Mars/Görmedi de bağımsız olarak bir sonraki eli tetikler
   // ve sayaç sıfırlanır.
