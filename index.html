@@ -2882,10 +2882,12 @@ let _firstLoad = true;
   STATE.startingBalancesLocked = !!val.startingBalancesLocked;
   STATE.sessions = val.sessions || {};
   STATE.activeSessionId = val.activeSessionId || null;
-  // pendingPayments'ı aktif oturumdan yükle
-  const _activeSess = STATE.activeSessionId ? STATE.sessions[STATE.activeSessionId] : null;
-  if (_activeSess && _activeSess.pendingPayments && typeof _activeSess.pendingPayments === 'object' && !Array.isArray(_activeSess.pendingPayments)){
-    pendingPayments = _activeSess.pendingPayments;
+  // pendingPayments'ı sadece ilk yüklemede oku
+  if (_firstLoad){
+    const _activeSess = STATE.activeSessionId ? STATE.sessions[STATE.activeSessionId] : null;
+    if (_activeSess && _activeSess.pendingPayments && typeof _activeSess.pendingPayments === 'object' && !Array.isArray(_activeSess.pendingPayments)){
+      pendingPayments = _activeSess.pendingPayments;
+    }
   }
   const activeSession = STATE.activeSessionId ? STATE.sessions[STATE.activeSessionId] : null;
   STATE.tables = activeSession ? (activeSession.tables || {}) : {};
