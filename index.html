@@ -125,9 +125,10 @@
   .chip button{background:none;border:none;color:var(--red);font-size:15px;padding:0;font-weight:900;}
 
   .player-pick{
-    display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;
+    display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:6px;
   }
   .pick{
+    text-align:center;justify-content:center;
     padding:9px 13px;border-radius:20px;border:1.5px solid var(--line);
     background:var(--card-soft);font-size:14px;font-weight:600;color:var(--ink);
   }
