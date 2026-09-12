@@ -2427,17 +2427,21 @@ function renderTotalsScreen(){
   if (totalsSelectedSession === null){
     totalsSelectedSession = STATE.activeSessionId || "ALL";
   }
-  // Seçili oturumun pendingPayments'ını Firebase'den oku
+  // Seçili oturum değişince pendingPayments'ı yükle
   const _sessId = totalsSelectedSession && totalsSelectedSession !== "ALL" ? totalsSelectedSession : STATE.activeSessionId;
-  if (_sessId && STATE.sessions[_sessId]){
-    const _pp = STATE.sessions[_sessId].pendingPayments;
-    if (_pp && typeof _pp === 'object'){
-      // Firebase array'leri object olarak döndürür: {0:{...}, 1:{...}} → diziye çevir
-      const toArr = v => v ? Object.values(v) : [];
-      pendingPayments = {
-        payers:    Array.isArray(_pp.payers)    ? _pp.payers    : toArr(_pp.payers),
-        receivers: Array.isArray(_pp.receivers) ? _pp.receivers : toArr(_pp.receivers)
-      };
+  if (_sessId !== window._ppLoadedFor) {
+    window._ppLoadedFor = _sessId;
+    if (_sessId && STATE.sessions[_sessId]){
+      const _pp = STATE.sessions[_sessId].pendingPayments;
+      if (_pp && typeof _pp === 'object'){
+        const toArr = v => v ? Object.values(v) : [];
+        pendingPayments = {
+          payers:    Array.isArray(_pp.payers)    ? _pp.payers    : toArr(_pp.payers),
+          receivers: Array.isArray(_pp.receivers) ? _pp.receivers : toArr(_pp.receivers)
+        };
+      } else {
+        pendingPayments = { payers: [], receivers: [] };
+      }
     } else {
       pendingPayments = { payers: [], receivers: [] };
     }
@@ -2664,6 +2668,7 @@ function renderPaymentInTotals(baseTotals){
       if (_sid3){
         fbUpdate(`sessions/${_sid3}`, { pendingPayments });
         if (STATE.sessions[_sid3]) STATE.sessions[_sid3].pendingPayments = JSON.parse(JSON.stringify(pendingPayments));
+        window._ppLoadedFor = _sid3;
       }
       renderTotalsScreen();
     });
@@ -2696,6 +2701,7 @@ document.getElementById("addPayerBtn").addEventListener("click", ()=>{
   if (_sid1){
     fbUpdate(`sessions/${_sid1}`, { pendingPayments });
     if (STATE.sessions[_sid1]) STATE.sessions[_sid1].pendingPayments = JSON.parse(JSON.stringify(pendingPayments));
+    window._ppLoadedFor = _sid1;
   }
   renderTotalsScreen();
 });
@@ -2711,6 +2717,7 @@ document.getElementById("addReceiverBtn").addEventListener("click", ()=>{
   if (_sid2){
     fbUpdate(`sessions/${_sid2}`, { pendingPayments });
     if (STATE.sessions[_sid2]) STATE.sessions[_sid2].pendingPayments = JSON.parse(JSON.stringify(pendingPayments));
+    window._ppLoadedFor = _sid2;
   }
   renderTotalsScreen();
 });
