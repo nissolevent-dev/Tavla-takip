@@ -2427,11 +2427,20 @@ function renderTotalsScreen(){
   if (totalsSelectedSession === null){
     totalsSelectedSession = STATE.activeSessionId || "ALL";
   }
-  // Seçili oturumun pendingPayments'ını her zaman Firebase'den oku
+  // Seçili oturumun pendingPayments'ını Firebase'den oku
   const _sessId = totalsSelectedSession && totalsSelectedSession !== "ALL" ? totalsSelectedSession : STATE.activeSessionId;
   if (_sessId && STATE.sessions[_sessId]){
     const _pp = STATE.sessions[_sessId].pendingPayments;
-    pendingPayments = (_pp && typeof _pp === 'object' && !Array.isArray(_pp)) ? _pp : { payers: [], receivers: [] };
+    if (_pp && typeof _pp === 'object'){
+      // Firebase array'leri object olarak döndürür: {0:{...}, 1:{...}} → diziye çevir
+      const toArr = v => v ? Object.values(v) : [];
+      pendingPayments = {
+        payers:    Array.isArray(_pp.payers)    ? _pp.payers    : toArr(_pp.payers),
+        receivers: Array.isArray(_pp.receivers) ? _pp.receivers : toArr(_pp.receivers)
+      };
+    } else {
+      pendingPayments = { payers: [], receivers: [] };
+    }
   }
   const sel = document.getElementById("totalsSessionSelect");
   const sessionEntries = Object.entries(STATE.sessions||{}).sort((a,b)=> (b[1].createdAt||0)-(a[1].createdAt||0));
