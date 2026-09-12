@@ -2427,10 +2427,11 @@ function renderTotalsScreen(){
   if (totalsSelectedSession === null){
     totalsSelectedSession = STATE.activeSessionId || "ALL";
   }
-  // Seçili oturumun pendingPayments'ını yükle
+  // Seçili oturum değişince pendingPayments'ı yükle
   const _sessId = totalsSelectedSession && totalsSelectedSession !== "ALL" ? totalsSelectedSession : STATE.activeSessionId;
-  if (_sessId && STATE.sessions[_sessId]){
-    const _pp = STATE.sessions[_sessId].pendingPayments;
+  if (_sessId && _sessId !== window._lastLoadedSessId){
+    window._lastLoadedSessId = _sessId;
+    const _pp = STATE.sessions[_sessId] ? STATE.sessions[_sessId].pendingPayments : null;
     if (_pp && typeof _pp === 'object' && !Array.isArray(_pp)){
       pendingPayments = _pp;
     } else {
