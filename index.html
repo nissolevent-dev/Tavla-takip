@@ -2645,6 +2645,7 @@ function renderPaymentInTotals(baseTotals){
       const idx  = parseInt(btn.getAttribute("data-idx"));
       if (type === "payer")    pendingPayments.payers.splice(idx, 1);
       if (type === "receiver") pendingPayments.receivers.splice(idx, 1);
+      if (STATE.activeSessionId) fbUpdate(`sessions/${STATE.activeSessionId}`, { pendingPayments });
       renderTotalsScreen();
     });
   });
@@ -2672,6 +2673,7 @@ document.getElementById("addPayerBtn").addEventListener("click", ()=>{
   if (!amount || amount <= 0){ alert("Geçerli bir tutar girin."); return; }
   pendingPayments.payers.push({ name, amount });
   document.getElementById("payerAmount").value = "";
+  if (STATE.activeSessionId) fbUpdate(`sessions/${STATE.activeSessionId}`, { pendingPayments });
   renderTotalsScreen();
 });
 
@@ -2682,6 +2684,7 @@ document.getElementById("addReceiverBtn").addEventListener("click", ()=>{
   if (!amount || amount <= 0){ alert("Geçerli bir tutar girin."); return; }
   pendingPayments.receivers.push({ name, amount });
   document.getElementById("receiverAmount").value = "";
+  if (STATE.activeSessionId) fbUpdate(`sessions/${STATE.activeSessionId}`, { pendingPayments });
   renderTotalsScreen();
 });
 
@@ -2879,6 +2882,11 @@ let _firstLoad = true;
   STATE.startingBalancesLocked = !!val.startingBalancesLocked;
   STATE.sessions = val.sessions || {};
   STATE.activeSessionId = val.activeSessionId || null;
+  // pendingPayments'ı aktif oturumdan yükle
+  const _activeSess = STATE.activeSessionId ? STATE.sessions[STATE.activeSessionId] : null;
+  if (_activeSess && _activeSess.pendingPayments && typeof _activeSess.pendingPayments === 'object' && !Array.isArray(_activeSess.pendingPayments)){
+    pendingPayments = _activeSess.pendingPayments;
+  }
   const activeSession = STATE.activeSessionId ? STATE.sessions[STATE.activeSessionId] : null;
   STATE.tables = activeSession ? (activeSession.tables || {}) : {};
   if (_firstLoad){
