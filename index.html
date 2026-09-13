@@ -3231,23 +3231,28 @@ const db = firebase.database();
 const ROOT = db.ref("tavla");
 
 
-/* ===================== GLOBAL STATE ===================== */
-let STATE = { players:{}, settings:{unitAmount:0}, startingBalances:{}, startingBalancesLocked:false, sessions:{}, activeSessionId:null, tables:{} };
-let vidoStack = [];
-let autoVidoDigit = 0;
-let autoVidoCallback = null;
-let gameBeforeVido = null;
+/* ===================== LOCAL STATE ===================== */
+let STATE = {
+  players: {},
+  settings: { unitAmount: 0 },
+  startingBalances: {},
+  startingBalancesLocked: false,
+  sessions: {},
+  activeSessionId: null,
+  tables: {}
+};
 let currentScreen = "s2";
 let currentTableId = null;
-let forcingNewSession = false;
-let sessionPlayerPick = {};
 let dicePick = { ranking: [] };
-let totalsSelectedSession = null;
-let pendingPayments = { payers: [], receivers: [] };
 let selectedVidoCallers = [];
 let selectedVidoSeers = {};
+let vidoStack = []; // her vido öncesi game snapshot'ı // Vido geri al için snapshot
+let sessionPlayerPick = {};
+let forcingNewSession = false;
+let totalsSelectedSession = null;
 let lastTotalsShareData = null;
-let _firstLoad = true;
+let pendingPayments = { payers: [], receivers: [] };
+
 
 function fbSet(path, value){ ROOT.child(path).set(value); }
 function fbPush(path, value){ return ROOT.child(path).push(value); }
@@ -3286,6 +3291,7 @@ function getPairCell(t, name1, name2){
   return { aName, bName, p: (t.game.pairs[aName]||{})[bName] };
 }
 function callableTargets(t, name){
+  // blockedCaller !== name: bu tur içinde aynı kişi aynı hedefe tekrar çekemez
   const side = sideOf(t, name);
   const g = t.game;
   const targets = [];
@@ -4727,7 +4733,7 @@ document.getElementById("confirmVidoBtn").addEventListener("click", ()=>{
           p.closed = true;
           p.closedLoser = targetName;
           p.closedAtCount = oldCount;
-          p.blockedCaller = caller; // görmese de bu turda kapandı, tekrar çekilemez
+          p.blockedCaller = caller;
         }
         g.vidoLog.push({ caller, opponent: targetName, from: oldCount, saw });
       });
@@ -4751,6 +4757,8 @@ document.getElementById("confirmVidoBtn").addEventListener("click", ()=>{
       if (uafBtn) uafBtn.style.display = "block";
     } else {
       fbSet(`${tablesPath()}/${currentTableId}/game`, g);
+      // Local state'i hemen güncelle - Firebase callback'i beklemeden blockedCaller korunsun
+      if (STATE.tables[currentTableId]) STATE.tables[currentTableId].game = g;
     }
     // Vido geri al butonu — bir önceki game state'i sakla
     document.getElementById("undoVidoBtn").style.display = "inline-block";
@@ -4931,10 +4939,11 @@ function finishHand(tableId, winnerSide, g, isMars){
     let rotationWinnerSide = winnerSide;
     const seatedWinner = winnerSide === "A" ? t.seated.A : t.seated.B;
     const seatedLoser  = winnerSide === "A" ? t.seated.B : t.seated.A;
+    const vidoLog = g.vidoLog || [];
+    // Kazanan oturan herhangi bir vidoyu görmemişse masadan kalkar.
+    // vidoLog yerine pairs'e bak — daha güvenilir.
     // Kural: Kazanan oturan, karşı tarafın OTURANININ vidasını görmemişse masadan kalkar.
     // Ortakların vidasını görmemesi masadan kalkmayı gerektirmez.
-    // pairs[seatedA][seatedB] hücresi: seatedA'nın seatedB'ye karşı çiftini gösterir.
-    // closedLoser === seatedWinner ise kazanan oturan bu çifti görmemiş demektir.
     const pairCell = (g.pairs[t.seated.A]||{})[t.seated.B];
     const winnerMissedLoserSeated = pairCell && pairCell.closed && pairCell.closedLoser === seatedWinner;
     if (winnerMissedLoserSeated){
@@ -5077,6 +5086,7 @@ document.getElementById("undoHandBtn").addEventListener("click", ()=>{
     autoVidoNextHand: !!snap.autoVidoNextHand,
     previousSnapshot: null,
   });
+  // vidoStack'i restore et ve butonu göster
   try { vidoStack = snap.vidoStack ? JSON.parse(snap.vidoStack) : []; } catch(e){ vidoStack = []; }
   const uvBtnH = document.getElementById("undoVidoBtn");
   if (uvBtnH) uvBtnH.style.display = vidoStack.length ? "inline-block" : "none";
@@ -5601,6 +5611,7 @@ goScreen("s2");
 ROOT.on("value", snap => {
 
 /* ===================== FIREBASE SYNC ===================== */
+let _firstLoad = true;
   const val = snap.val() || {};
   STATE.players = val.players || {};
   STATE.settings = val.settings || { unitAmount: 0 };
