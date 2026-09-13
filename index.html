@@ -522,6 +522,42 @@
   </div>
 </div>
 
+<!-- VİDO TİPİ MODALI -->
+<div id="vidoTypeModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:16px;padding:22px 20px;max-width:300px;width:100%;">
+    <h2 style="margin:0 0 8px;font-size:14px;color:var(--gold-dark);text-transform:uppercase;font-weight:700;letter-spacing:.5px;">Otomatik Vido</h2>
+    <div class="small-note" style="margin-bottom:18px;">Bu oturumda otomatik vido nasıl olsun?</div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button id="vido3ElBtn" class="btn-main" style="font-size:14px;padding:12px;">🎲 3 elde bir otomatik vido</button>
+      <button id="vidoHerElBtn" class="btn-main" style="font-size:14px;padding:12px;">🎲 Her el vido sorulsun</button>
+      <button id="vidoSizBtn" class="btn-main" style="font-size:14px;padding:12px;">Otomatik vidosuz</button>
+    </div>
+  </div>
+</div>
+
+<!-- OTOMATİK VİDO SORMA MODALI -->
+<div id="autoVidoOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:16px;padding:22px 20px;max-width:300px;width:100%;">
+    <h2 style="margin:0 0 8px;font-size:14px;color:var(--gold-dark);text-transform:uppercase;font-weight:700;letter-spacing:.5px;">🎲 Otomatik Vido</h2>
+    <div id="autoVidoStep1">
+      <div class="small-note" style="margin-bottom:16px;">Bu elde başlangıçta otomatik vido var mı?</div>
+      <div class="row">
+        <button class="btn-soft" id="autoVidoNo">Yok — Normal Başlat</button>
+        <button class="btn-main" id="autoVidoYes" style="margin-top:0;">Var</button>
+      </div>
+    </div>
+    <div id="autoVidoStep2" style="display:none;">
+      <div class="small-note" style="margin-bottom:4px;">Kaç otomatik vido var?</div>
+      <div class="small-note" style="margin-bottom:14px;color:var(--gold-dark);font-weight:700;" id="autoVidoPreview"></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px;" id="autoVidoKeypad"></div>
+      <div class="row" style="margin-top:14px;">
+        <button class="btn-soft" id="autoVidoBack">← Geri</button>
+        <button class="btn-main" id="autoVidoConfirm" style="margin-top:0;">Başlat</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="tabbar">
   <button data-go="s1" id="tabPlayers">OYUNCULAR</button>
   <button data-go="s2" id="tabTables">MASALAR</button>
@@ -564,7 +600,9 @@ let currentTableId = null;
 let dicePick = { ranking: [] };
 let selectedVidoCallers = [];
 let selectedVidoSeers = {};
-let vidoStack = []; // her vido öncesi game snapshot'ı // Vido geri al için snapshot
+let vidoStack = [];
+let autoVidoDigit = 0;
+let autoVidoCallback = null; // her vido öncesi game snapshot'ı // Vido geri al için snapshot
 let sessionPlayerPick = {};
 let forcingNewSession = false;
 let totalsSelectedSession = null;
@@ -1672,24 +1710,98 @@ function seat2v2FromRotation(king, fullOrder){
 
 let pendingFormat = null; // "1v3" veya "2v2"
 
+function openAutoVidoModal(onConfirm, defaultDigit){
+  autoVidoDigit = defaultDigit || 0;
+  autoVidoCallback = onConfirm || null;
+  if (defaultDigit){
+    document.getElementById("autoVidoStep1").style.display = "none";
+    document.getElementById("autoVidoStep2").style.display = "block";
+    buildAutoVidoKeypad();
+    renderAutoVidoPreview();
+  } else {
+    document.getElementById("autoVidoStep1").style.display = "block";
+    document.getElementById("autoVidoStep2").style.display = "none";
+  }
+  document.getElementById("autoVidoOverlay").style.display = "flex";
+}
+function closeAutoVidoModal(){
+  document.getElementById("autoVidoOverlay").style.display = "none";
+}
+function renderAutoVidoPreview(){
+  const count = autoVidoDigit;
+  const multiplier = Math.pow(2, count);
+  document.getElementById("autoVidoPreview").textContent =
+    count === 0 ? "0 vido → normal başlar (x1)" : count + " vido → " + multiplier + "x başlar";
+}
+function buildAutoVidoKeypad(){
+  const kp = document.getElementById("autoVidoKeypad");
+  if (kp.childElementCount) return;
+  ["1","2","3","4","5","6","7","8","9","","0","⌫"].forEach(k=>{
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "pw-key" + (k==="" ? " pw-key-empty" : "");
+    btn.textContent = k;
+    if (k !== ""){
+      btn.addEventListener("click", ()=>{
+        if (k === "⌫"){ autoVidoDigit = 0; }
+        else { const n = parseInt(k); if (n >= 1 && n <= 9) autoVidoDigit = n; }
+        renderAutoVidoPreview();
+      });
+    }
+    kp.appendChild(btn);
+  });
+}
+function openVidoTypeModal(onSelect){
+  document.getElementById("vidoTypeModalOverlay").style.display = "flex";
+  document.getElementById("vido3ElBtn").onclick = ()=>{
+    document.getElementById("vidoTypeModalOverlay").style.display = "none";
+    onSelect("3el");
+  };
+  document.getElementById("vidoHerElBtn").onclick = ()=>{
+    document.getElementById("vidoTypeModalOverlay").style.display = "none";
+    onSelect("herel");
+  };
+  document.getElementById("vidoSizBtn").onclick = ()=>{
+    document.getElementById("vidoTypeModalOverlay").style.display = "none";
+    onSelect("siz");
+  };
+}
 function openFormatModal(onSelect){
   document.getElementById("formatModalOverlay").style.display = "flex";
   document.getElementById("format1v3Btn").onclick = ()=>{
     document.getElementById("formatModalOverlay").style.display = "none";
-    onSelect("1v3");
+    openVidoTypeModal((vidoType)=>{ onSelect("1v3", vidoType); });
   };
   document.getElementById("format2v2Btn").onclick = ()=>{
     document.getElementById("formatModalOverlay").style.display = "none";
-    onSelect("2v2");
+    openVidoTypeModal((vidoType)=>{ onSelect("2v2", vidoType); });
   };
 }
 
-function launchDiceGame(autoVidoCount){
+function launchDiceGame(autoVidoCount, vidoType){
   if (dicePick.ranking.length < 2) return;
   const fmt = pendingFormat || "1v3";
   const setup = fmt === "2v2"
     ? rotationFromRanking_2v2(dicePick.ranking)
     : rotationFromRanking(dicePick.ranking);
+  if (vidoType === "herel"){
+    openAutoVidoModal((count)=>{
+      const game = buildInitialGame(setup.seated, setup.partners);
+      if (count > 0){
+        Object.values(game.pairs).forEach(oppMap=>{
+          Object.values(oppMap).forEach(p=>{ p.count = count; });
+        });
+      }
+      fbUpdate(`${tablesPath()}/${currentTableId}`, {
+        seated: setup.seated, partners: setup.partners, rotation: setup.rotation,
+        usesRotation: true, usesKingHelper: setup.usesKingHelper, format: fmt,
+        initialRanking: dicePick.ranking.slice(), autoVidoNextHand: false,
+        handsSinceReset: 1, vidoMode: "herel", game
+      });
+      goScreen("s4", currentTableId);
+    });
+    return;
+  }
   const game = buildInitialGame(setup.seated, setup.partners);
   if (autoVidoCount > 0){
     Object.values(game.pairs).forEach(oppMap=>{
@@ -1697,16 +1809,10 @@ function launchDiceGame(autoVidoCount){
     });
   }
   fbUpdate(`${tablesPath()}/${currentTableId}`, {
-    seated: setup.seated,
-    partners: setup.partners,
-    rotation: setup.rotation,
-    usesRotation: true,
-    usesKingHelper: setup.usesKingHelper,
-    format: fmt,
-    initialRanking: dicePick.ranking.slice(),
-    autoVidoNextHand: false,
-    handsSinceReset: 1,
-    game
+    seated: setup.seated, partners: setup.partners, rotation: setup.rotation,
+    usesRotation: true, usesKingHelper: setup.usesKingHelper, format: fmt,
+    initialRanking: dicePick.ranking.slice(), autoVidoNextHand: false,
+    handsSinceReset: 1, vidoMode: vidoType || "3el", game
   });
   goScreen("s4", currentTableId);
 }
@@ -1717,13 +1823,13 @@ document.getElementById("startDiceGameBtn").addEventListener("click", ()=>{
     return;
   }
   if (dicePick.ranking.length === 4){
-    openFormatModal((fmt)=>{
+    openFormatModal((fmt, vidoType)=>{
       pendingFormat = fmt;
-      launchDiceGame(0);
+      launchDiceGame(0, vidoType);
     });
   } else {
     pendingFormat = "1v3";
-    launchDiceGame(0);
+    openVidoTypeModal((vidoType)=>{ launchDiceGame(0, vidoType); });
   }
 });
 
@@ -2226,15 +2332,24 @@ function finishHand(tableId, winnerSide, g, isMars){
   const wasAutoVidoEl = !!(g.isAutoVidoHand);
   const marsOrGormedi = wasAutoVidoEl && !!(isMars || seatedPlayerGormedí);
   let handsSinceReset, autoVidoNextHand;
-  if (marsOrGormedi){
-    autoVidoNextHand = true;
-    handsSinceReset = 0; // sıfırdan yeniden say
-  } else if (prevCount + 1 >= 3){
-    autoVidoNextHand = true; // 3. el tamamlandı, sonraki otomatik vido
-    handsSinceReset = 0;
-  } else {
+  const vidoMode = t.vidoMode || "3el";
+  if (vidoMode === "siz"){
     autoVidoNextHand = false;
     handsSinceReset = prevCount + 1;
+  } else if (vidoMode === "herel"){
+    autoVidoNextHand = !!isMars;
+    handsSinceReset = 0;
+  } else {
+    if (marsOrGormedi){
+      autoVidoNextHand = true;
+      handsSinceReset = 0;
+    } else if (prevCount + 1 >= 3){
+      autoVidoNextHand = true;
+      handsSinceReset = 0;
+    } else {
+      autoVidoNextHand = false;
+      handsSinceReset = prevCount + 1;
+    }
   }
 
   let newRotation = null;
@@ -2267,7 +2382,7 @@ function finishHand(tableId, winnerSide, g, isMars){
       rotation: { king: next.king, fullOrder: next.fullOrder, format: t.format || "1v3" }
     });
   } else {
-    fbUpdate(`${tablesPath()}/${tableId}`, { game: g, previousSnapshot, autoVidoNextHand, handsSinceReset });
+    fbUpdate(`${tablesPath()}/${tableId}`, { game: g, previousSnapshot, autoVidoNextHand, handsSinceReset, vidoMode: t.vidoMode || "3el" });
   }
   return newRotation;
 }
@@ -2347,22 +2462,31 @@ document.getElementById("undoAutoFinishBtn").addEventListener("click", ()=>{
 document.getElementById("nextHandBtn").addEventListener("click", ()=>{
   try{
     const t = STATE.tables[currentTableId];
-    const autoVidoCount = (t && shouldAutoVido(t)) ? 1 : 0;
-    if (autoVidoCount > 0){
-      document.getElementById("autoVidoModal").style.display = "flex";
-      document.getElementById("autoVidoModalOk").onclick = ()=>{
-        document.getElementById("autoVidoModal").style.display = "none";
-        try{ startGameForTable(currentTableId, autoVidoCount); }
+    const vidoMode = t ? (t.vidoMode || "3el") : "3el";
+    if (vidoMode === "herel"){
+      const _defaultVido = (t && t.autoVidoNextHand) ? 1 : 0;
+      openAutoVidoModal((count)=>{
+        try{ startGameForTable(currentTableId, count); }
         catch(e){ console.error(e); alert("Yeni el başlatılırken bir hata oluştu: " + e.message); }
-      };
+      }, _defaultVido);
     } else {
-      startGameForTable(currentTableId, 0);
+      const autoVidoCount = (t && shouldAutoVido(t)) ? 1 : 0;
+      if (autoVidoCount > 0){
+        document.getElementById("autoVidoModal").style.display = "flex";
+        document.getElementById("autoVidoModalOk").onclick = ()=>{
+          document.getElementById("autoVidoModal").style.display = "none";
+          try{ startGameForTable(currentTableId, autoVidoCount); }
+          catch(e){ console.error(e); alert("Yeni el başlatılırken bir hata oluştu: " + e.message); }
+        };
+      } else {
+        startGameForTable(currentTableId, 0);
+      }
     }
   } catch(e){
     console.error(e);
     alert("Yeni el başlatılırken bir hata oluştu: " + e.message);
   }
-});
+});;
 
 document.getElementById("undoVidoBtn").addEventListener("click", ()=>{
   if (!vidoStack.length){ alert("Geri alınacak vido yok."); return; }
@@ -2913,6 +3037,32 @@ function escapeHtml(s){
 
 /* Uygulama açılışta Masalar sekmesinde başlasın. */
 goScreen("s2");
+
+document.getElementById("autoVidoNo").addEventListener("click", ()=>{
+  const cb = autoVidoCallback;
+  closeAutoVidoModal();
+  if (cb) cb(0);
+  else launchDiceGame(0);
+});
+document.getElementById("autoVidoYes").addEventListener("click", ()=>{
+  autoVidoDigit = 0;
+  document.getElementById("autoVidoStep1").style.display = "none";
+  document.getElementById("autoVidoStep2").style.display = "block";
+  buildAutoVidoKeypad();
+  renderAutoVidoPreview();
+});
+document.getElementById("autoVidoBack").addEventListener("click", ()=>{
+  document.getElementById("autoVidoStep1").style.display = "block";
+  document.getElementById("autoVidoStep2").style.display = "none";
+});
+document.getElementById("autoVidoConfirm").addEventListener("click", ()=>{
+  if (autoVidoDigit < 1){ alert("En az 1 vido girin."); return; }
+  const count = autoVidoDigit;
+  const cb = autoVidoCallback;
+  closeAutoVidoModal();
+  if (cb) cb(count);
+  else launchDiceGame(count);
+});
 
 ROOT.on("value", snap => {
 
