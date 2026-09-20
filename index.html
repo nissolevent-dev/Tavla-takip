@@ -1913,8 +1913,7 @@ function startGameForTable(id, autoVidoCount){
     });
   }
   game.isAutoVidoHand = isAutoVidoHand;
-  const _vm = t.vidoMode || "3el";
-  const newHandsSinceReset = isAutoVidoHand ? 0 : (_vm === "herel" || _vm === "siz") ? 0 : (t.handsSinceReset !== undefined ? t.handsSinceReset : 1);
+  const _vm2=t.vidoMode||"3el"; const newHandsSinceReset=isAutoVidoHand?0:(_vm2==="herel"||_vm2==="siz")?0:(t.handsSinceReset!==undefined?t.handsSinceReset:1);
   fbUpdate(`${tablesPath()}/${id}`, { game, autoVidoNextHand: false, handsSinceReset: newHandsSinceReset });
   vidoStack = [];
   const uafBtn = document.getElementById("undoAutoFinishBtn");
