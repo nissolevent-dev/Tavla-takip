@@ -2845,7 +2845,8 @@ document.getElementById("addPayerBtn").addEventListener("click", ()=>{
   const amount = parseFloat(document.getElementById("payerAmount").value);
   if (!name) return;
   if (!amount || amount <= 0){ alert("Geçerli bir tutar girin."); return; }
-  pendingPayments.payers.push({ name, amount });
+  const _isAll1 = !totalsSelectedSession || totalsSelectedSession === "ALL";
+  pendingPayments.payers.push(_isAll1 ? { name, amount, _src:"global" } : { name, amount });
   document.getElementById("payerAmount").value = "";
   const _sid1 = totalsSelectedSession && totalsSelectedSession !== "ALL" ? totalsSelectedSession : null;
   if (_sid1){
@@ -2853,10 +2854,13 @@ document.getElementById("addPayerBtn").addEventListener("click", ()=>{
     if (STATE.sessions[_sid1]) STATE.sessions[_sid1].pendingPayments = JSON.parse(JSON.stringify(pendingPayments));
     window._ppLoadedFor = _sid1;
   } else {
-    // Tüm oturumlar modunda globalPayments'a kaydet
-    fbUpdate(`globalPayments/pendingPayments`, pendingPayments);
-    STATE.globalPayments = { pendingPayments: JSON.parse(JSON.stringify(pendingPayments)) };
-    window._ppLoadedFor = "ALL";
+    // Tüm oturumlar modunda: sadece global kayıtları kaydet
+    const _gPayers = pendingPayments.payers.filter(p=>p._src==="global").map(({_src,...p})=>p);
+    const _gReceivers = pendingPayments.receivers.filter(p=>p._src==="global").map(({_src,...p})=>p);
+    const _gPP = { payers: _gPayers, receivers: _gReceivers };
+    fbUpdate(`globalPayments/pendingPayments`, _gPP);
+    STATE.globalPayments = { pendingPayments: JSON.parse(JSON.stringify(_gPP)) };
+    window._ppLoadedFor = null;
   }
   renderTotalsScreen();
 });
@@ -2866,7 +2870,8 @@ document.getElementById("addReceiverBtn").addEventListener("click", ()=>{
   const amount = parseFloat(document.getElementById("receiverAmount").value);
   if (!name) return;
   if (!amount || amount <= 0){ alert("Geçerli bir tutar girin."); return; }
-  pendingPayments.receivers.push({ name, amount });
+  const _isAll2 = !totalsSelectedSession || totalsSelectedSession === "ALL";
+  pendingPayments.receivers.push(_isAll2 ? { name, amount, _src:"global" } : { name, amount });
   document.getElementById("receiverAmount").value = "";
   const _sid2 = totalsSelectedSession && totalsSelectedSession !== "ALL" ? totalsSelectedSession : null;
   if (_sid2){
