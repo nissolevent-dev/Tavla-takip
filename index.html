@@ -2879,9 +2879,12 @@ document.getElementById("addReceiverBtn").addEventListener("click", ()=>{
     if (STATE.sessions[_sid2]) STATE.sessions[_sid2].pendingPayments = JSON.parse(JSON.stringify(pendingPayments));
     window._ppLoadedFor = _sid2;
   } else {
-    fbUpdate(`globalPayments/pendingPayments`, pendingPayments);
-    STATE.globalPayments = { pendingPayments: JSON.parse(JSON.stringify(pendingPayments)) };
-    window._ppLoadedFor = "ALL";
+    const _gP = pendingPayments.payers.filter(p=>p._src==="global").map(({_src,...p})=>p);
+    const _gR = pendingPayments.receivers.filter(p=>p._src==="global").map(({_src,...p})=>p);
+    const _gPP3 = { payers: _gP, receivers: _gR };
+    fbUpdate(`globalPayments/pendingPayments`, _gPP3);
+    STATE.globalPayments = { pendingPayments: JSON.parse(JSON.stringify(_gPP3)) };
+    window._ppLoadedFor = null;
   }
   renderTotalsScreen();
 });
