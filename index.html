@@ -2578,7 +2578,8 @@ function renderTotalsScreen(){
       const gp = STATE.globalPayments && STATE.globalPayments.pendingPayments ? STATE.globalPayments.pendingPayments : STATE.globalPayments;
       const gpPayers = gp ? (Array.isArray(gp.payers) ? gp.payers : toArr2(gp.payers)) : [];
       const gpReceivers = gp ? (Array.isArray(gp.receivers) ? gp.receivers : toArr2(gp.receivers)) : [];
-      const allPayers = [...gpPayers], allReceivers = [...gpReceivers];
+      const allPayers = gpPayers.map(p=>({...p, _src:"global"}));
+      const allReceivers = gpReceivers.map(p=>({...p, _src:"global"}));
       Object.values(STATE.sessions||{}).forEach(s => {
         const pp = ppFromSess(s);
         allPayers.push(...pp.payers);
@@ -2780,7 +2781,7 @@ function renderPaymentInTotals(baseTotals){
         <span>${escapeHtml(p.name)}</span>
         <span style="display:flex;align-items:center;gap:6px;">
           <span style="color:#c0392b;">−${p.amount.toFixed(0)} ₺</span>
-          ${totalsSelectedSession && totalsSelectedSession !== "ALL" ? `<button class="btn-danger btn-sm" data-type="payer" data-idx="${i}">×</button>` : ""}
+          ${(totalsSelectedSession && totalsSelectedSession !== "ALL") || p._src === "global" ? `<button class="btn-danger btn-sm" data-type="payer" data-idx="${i}">×</button>` : ""}
         </span>
       </div>`).join("") || `<div class="small-note" style="font-size:12px;">Henüz yok</div>`;
   }
@@ -2793,7 +2794,7 @@ function renderPaymentInTotals(baseTotals){
         <span>${escapeHtml(p.name)}</span>
         <span style="display:flex;align-items:center;gap:6px;">
           <span style="color:var(--green-dark,#2a7a4b);">+${p.amount.toFixed(0)} ₺</span>
-          ${totalsSelectedSession && totalsSelectedSession !== "ALL" ? `<button class="btn-danger btn-sm" data-type="receiver" data-idx="${i}">×</button>` : ""}
+          ${(totalsSelectedSession && totalsSelectedSession !== "ALL") || p._src === "global" ? `<button class="btn-danger btn-sm" data-type="receiver" data-idx="${i}">×</button>` : ""}
         </span>
       </div>`).join("") || `<div class="small-note" style="font-size:12px;">Henüz yok</div>`;
   }
@@ -2811,9 +2812,13 @@ function renderPaymentInTotals(baseTotals){
         if (STATE.sessions[_sid3]) STATE.sessions[_sid3].pendingPayments = JSON.parse(JSON.stringify(pendingPayments));
         window._ppLoadedFor = _sid3;
       } else {
-        fbUpdate(`globalPayments/pendingPayments`, pendingPayments);
-        STATE.globalPayments = JSON.parse(JSON.stringify(pendingPayments));
-        window._ppLoadedFor = "ALL";
+        // ALL modunda: _src=global olanları globalPayments'a kaydet
+        const cleanPayers = pendingPayments.payers.filter(p=>p._src==="global").map(({_src,...p})=>p);
+        const cleanReceivers = pendingPayments.receivers.filter(p=>p._src==="global").map(({_src,...p})=>p);
+        const cleanPP = { payers: cleanPayers, receivers: cleanReceivers };
+        fbUpdate(`globalPayments/pendingPayments`, cleanPP);
+        STATE.globalPayments = { pendingPayments: JSON.parse(JSON.stringify(cleanPP)) };
+        window._ppLoadedFor = null;
       }
       renderTotalsScreen();
     });
