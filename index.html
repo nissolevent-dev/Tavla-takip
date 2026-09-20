@@ -2573,18 +2573,12 @@ function renderTotalsScreen(){
     if (_sessId && STATE.sessions[_sessId]){
       pendingPayments = ppFromSess(STATE.sessions[_sessId]);
     } else {
-      // ALL: globalPayments + tüm oturumların pendingPayments'larını birleştir
+      // ALL: sadece globalPayments göster (oturum ödemeleri kendi sayfalarında)
       const toArr2 = v => v ? Object.values(v) : [];
       const gp = STATE.globalPayments && STATE.globalPayments.pendingPayments ? STATE.globalPayments.pendingPayments : STATE.globalPayments;
       const gpPayers = gp ? (Array.isArray(gp.payers) ? gp.payers : toArr2(gp.payers)) : [];
       const gpReceivers = gp ? (Array.isArray(gp.receivers) ? gp.receivers : toArr2(gp.receivers)) : [];
-      const allPayers = [...gpPayers], allReceivers = [...gpReceivers];
-      Object.values(STATE.sessions||{}).forEach(s => {
-        const pp = ppFromSess(s);
-        allPayers.push(...pp.payers);
-        allReceivers.push(...pp.receivers);
-      });
-      pendingPayments = { payers: allPayers, receivers: allReceivers };
+      pendingPayments = { payers: gpPayers, receivers: gpReceivers };
     }
   }
   const sel = document.getElementById("totalsSessionSelect");
@@ -2850,7 +2844,7 @@ document.getElementById("addPayerBtn").addEventListener("click", ()=>{
   } else {
     // Tüm oturumlar modunda globalPayments'a kaydet
     fbUpdate(`globalPayments/pendingPayments`, pendingPayments);
-    STATE.globalPayments = JSON.parse(JSON.stringify(pendingPayments));
+    STATE.globalPayments = { pendingPayments: JSON.parse(JSON.stringify(pendingPayments)) };
     window._ppLoadedFor = "ALL";
   }
   renderTotalsScreen();
@@ -2870,7 +2864,7 @@ document.getElementById("addReceiverBtn").addEventListener("click", ()=>{
     window._ppLoadedFor = _sid2;
   } else {
     fbUpdate(`globalPayments/pendingPayments`, pendingPayments);
-    STATE.globalPayments = JSON.parse(JSON.stringify(pendingPayments));
+    STATE.globalPayments = { pendingPayments: JSON.parse(JSON.stringify(pendingPayments)) };
     window._ppLoadedFor = "ALL";
   }
   renderTotalsScreen();
