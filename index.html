@@ -2558,7 +2558,8 @@ function renderTotalsScreen(){
   const _sessId = totalsSelectedSession && totalsSelectedSession !== "ALL" ? totalsSelectedSession : null;
   const _ppKey = _sessId || "ALL";
   const _sessHasPP = _sessId && STATE.sessions[_sessId] && STATE.sessions[_sessId].pendingPayments;
-  if (_ppKey !== window._ppLoadedFor || (_sessHasPP && window._ppLoadedFor === _ppKey && !pendingPayments.payers.length && !pendingPayments.receivers.length)) {
+  const _globalHasPP = !_sessId && STATE.globalPayments;
+  if (_ppKey !== window._ppLoadedFor || _sessHasPP || _globalHasPP) {
     window._ppLoadedFor = _ppKey;
     const toArr = v => v ? Object.values(v) : [];
     const ppFromSess = (s) => {
