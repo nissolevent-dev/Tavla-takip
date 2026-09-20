@@ -2572,8 +2572,12 @@ function renderTotalsScreen(){
     if (_sessId && STATE.sessions[_sessId]){
       pendingPayments = ppFromSess(STATE.sessions[_sessId]);
     } else {
-      // ALL: tüm oturumların pendingPayments'larını birleştir
-      const allPayers = [], allReceivers = [];
+      // ALL: globalPayments + tüm oturumların pendingPayments'larını birleştir
+      const toArr2 = v => v ? Object.values(v) : [];
+      const gp = STATE.globalPayments;
+      const gpPayers = gp ? (Array.isArray(gp.payers) ? gp.payers : toArr2(gp.payers)) : [];
+      const gpReceivers = gp ? (Array.isArray(gp.receivers) ? gp.receivers : toArr2(gp.receivers)) : [];
+      const allPayers = [...gpPayers], allReceivers = [...gpReceivers];
       Object.values(STATE.sessions||{}).forEach(s => {
         const pp = ppFromSess(s);
         allPayers.push(...pp.payers);
@@ -2800,11 +2804,15 @@ function renderPaymentInTotals(baseTotals){
       const idx  = parseInt(btn.getAttribute("data-idx"));
       if (type === "payer")    pendingPayments.payers.splice(idx, 1);
       if (type === "receiver") pendingPayments.receivers.splice(idx, 1);
-      const _sid3 = totalsSelectedSession && totalsSelectedSession !== "ALL" ? totalsSelectedSession : STATE.activeSessionId;
+      const _sid3 = totalsSelectedSession && totalsSelectedSession !== "ALL" ? totalsSelectedSession : null;
       if (_sid3){
         fbUpdate(`sessions/${_sid3}`, { pendingPayments });
         if (STATE.sessions[_sid3]) STATE.sessions[_sid3].pendingPayments = JSON.parse(JSON.stringify(pendingPayments));
         window._ppLoadedFor = _sid3;
+      } else {
+        fbUpdate(`globalPayments`, { pendingPayments });
+        STATE.globalPayments = JSON.parse(JSON.stringify(pendingPayments));
+        window._ppLoadedFor = "ALL";
       }
       renderTotalsScreen();
     });
@@ -2833,11 +2841,16 @@ document.getElementById("addPayerBtn").addEventListener("click", ()=>{
   if (!amount || amount <= 0){ alert("Geçerli bir tutar girin."); return; }
   pendingPayments.payers.push({ name, amount });
   document.getElementById("payerAmount").value = "";
-  const _sid1 = totalsSelectedSession && totalsSelectedSession !== "ALL" ? totalsSelectedSession : STATE.activeSessionId;
+  const _sid1 = totalsSelectedSession && totalsSelectedSession !== "ALL" ? totalsSelectedSession : null;
   if (_sid1){
     fbUpdate(`sessions/${_sid1}`, { pendingPayments });
     if (STATE.sessions[_sid1]) STATE.sessions[_sid1].pendingPayments = JSON.parse(JSON.stringify(pendingPayments));
     window._ppLoadedFor = _sid1;
+  } else {
+    // Tüm oturumlar modunda globalPayments'a kaydet
+    fbUpdate(`globalPayments`, { pendingPayments });
+    STATE.globalPayments = JSON.parse(JSON.stringify(pendingPayments));
+    window._ppLoadedFor = "ALL";
   }
   renderTotalsScreen();
 });
@@ -2849,11 +2862,15 @@ document.getElementById("addReceiverBtn").addEventListener("click", ()=>{
   if (!amount || amount <= 0){ alert("Geçerli bir tutar girin."); return; }
   pendingPayments.receivers.push({ name, amount });
   document.getElementById("receiverAmount").value = "";
-  const _sid2 = totalsSelectedSession && totalsSelectedSession !== "ALL" ? totalsSelectedSession : STATE.activeSessionId;
+  const _sid2 = totalsSelectedSession && totalsSelectedSession !== "ALL" ? totalsSelectedSession : null;
   if (_sid2){
     fbUpdate(`sessions/${_sid2}`, { pendingPayments });
     if (STATE.sessions[_sid2]) STATE.sessions[_sid2].pendingPayments = JSON.parse(JSON.stringify(pendingPayments));
     window._ppLoadedFor = _sid2;
+  } else {
+    fbUpdate(`globalPayments`, { pendingPayments });
+    STATE.globalPayments = JSON.parse(JSON.stringify(pendingPayments));
+    window._ppLoadedFor = "ALL";
   }
   renderTotalsScreen();
 });
@@ -3077,6 +3094,7 @@ let _firstLoad = true;
   STATE.startingBalances = val.startingBalances || {};
   STATE.startingBalancesLocked = !!val.startingBalancesLocked;
   STATE.sessions = val.sessions || {};
+  STATE.globalPayments = val.globalPayments || null;
   STATE.activeSessionId = val.activeSessionId || null;
 
   const activeSession = STATE.activeSessionId ? STATE.sessions[STATE.activeSessionId] : null;
