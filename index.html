@@ -2557,7 +2557,8 @@ function renderTotalsScreen(){
   // Seçili oturum değişince pendingPayments'ı yükle
   const _sessId = totalsSelectedSession && totalsSelectedSession !== "ALL" ? totalsSelectedSession : null;
   const _ppKey = _sessId || "ALL";
-  if (_ppKey !== window._ppLoadedFor) {
+  const _sessHasPP = _sessId && STATE.sessions[_sessId] && STATE.sessions[_sessId].pendingPayments;
+  if (_ppKey !== window._ppLoadedFor || (_sessHasPP && window._ppLoadedFor === _ppKey && !pendingPayments.payers.length && !pendingPayments.receivers.length)) {
     window._ppLoadedFor = _ppKey;
     const toArr = v => v ? Object.values(v) : [];
     const ppFromSess = (s) => {
