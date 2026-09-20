@@ -2575,7 +2575,7 @@ function renderTotalsScreen(){
     } else {
       // ALL: globalPayments + tüm oturumların pendingPayments'larını birleştir
       const toArr2 = v => v ? Object.values(v) : [];
-      const gp = STATE.globalPayments;
+      const gp = STATE.globalPayments && STATE.globalPayments.pendingPayments ? STATE.globalPayments.pendingPayments : STATE.globalPayments;
       const gpPayers = gp ? (Array.isArray(gp.payers) ? gp.payers : toArr2(gp.payers)) : [];
       const gpReceivers = gp ? (Array.isArray(gp.receivers) ? gp.receivers : toArr2(gp.receivers)) : [];
       const allPayers = [...gpPayers], allReceivers = [...gpReceivers];
@@ -2811,7 +2811,7 @@ function renderPaymentInTotals(baseTotals){
         if (STATE.sessions[_sid3]) STATE.sessions[_sid3].pendingPayments = JSON.parse(JSON.stringify(pendingPayments));
         window._ppLoadedFor = _sid3;
       } else {
-        fbUpdate(`globalPayments`, { pendingPayments });
+        fbUpdate(`globalPayments/pendingPayments`, pendingPayments);
         STATE.globalPayments = JSON.parse(JSON.stringify(pendingPayments));
         window._ppLoadedFor = "ALL";
       }
@@ -2849,7 +2849,7 @@ document.getElementById("addPayerBtn").addEventListener("click", ()=>{
     window._ppLoadedFor = _sid1;
   } else {
     // Tüm oturumlar modunda globalPayments'a kaydet
-    fbUpdate(`globalPayments`, { pendingPayments });
+    fbUpdate(`globalPayments/pendingPayments`, pendingPayments);
     STATE.globalPayments = JSON.parse(JSON.stringify(pendingPayments));
     window._ppLoadedFor = "ALL";
   }
@@ -2869,7 +2869,7 @@ document.getElementById("addReceiverBtn").addEventListener("click", ()=>{
     if (STATE.sessions[_sid2]) STATE.sessions[_sid2].pendingPayments = JSON.parse(JSON.stringify(pendingPayments));
     window._ppLoadedFor = _sid2;
   } else {
-    fbUpdate(`globalPayments`, { pendingPayments });
+    fbUpdate(`globalPayments/pendingPayments`, pendingPayments);
     STATE.globalPayments = JSON.parse(JSON.stringify(pendingPayments));
     window._ppLoadedFor = "ALL";
   }
