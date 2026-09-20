@@ -2573,12 +2573,18 @@ function renderTotalsScreen(){
     if (_sessId && STATE.sessions[_sessId]){
       pendingPayments = ppFromSess(STATE.sessions[_sessId]);
     } else {
-      // ALL: sadece globalPayments göster (oturum ödemeleri kendi sayfalarında)
+      // ALL: globalPayments + tüm oturumların pendingPayments'larını birleştir
       const toArr2 = v => v ? Object.values(v) : [];
       const gp = STATE.globalPayments && STATE.globalPayments.pendingPayments ? STATE.globalPayments.pendingPayments : STATE.globalPayments;
       const gpPayers = gp ? (Array.isArray(gp.payers) ? gp.payers : toArr2(gp.payers)) : [];
       const gpReceivers = gp ? (Array.isArray(gp.receivers) ? gp.receivers : toArr2(gp.receivers)) : [];
-      pendingPayments = { payers: gpPayers, receivers: gpReceivers };
+      const allPayers = [...gpPayers], allReceivers = [...gpReceivers];
+      Object.values(STATE.sessions||{}).forEach(s => {
+        const pp = ppFromSess(s);
+        allPayers.push(...pp.payers);
+        allReceivers.push(...pp.receivers);
+      });
+      pendingPayments = { payers: allPayers, receivers: allReceivers };
     }
   }
   const sel = document.getElementById("totalsSessionSelect");
@@ -2774,7 +2780,7 @@ function renderPaymentInTotals(baseTotals){
         <span>${escapeHtml(p.name)}</span>
         <span style="display:flex;align-items:center;gap:6px;">
           <span style="color:#c0392b;">−${p.amount.toFixed(0)} ₺</span>
-          <button class="btn-danger btn-sm" data-type="payer" data-idx="${i}">×</button>
+          ${totalsSelectedSession && totalsSelectedSession !== "ALL" ? `<button class="btn-danger btn-sm" data-type="payer" data-idx="${i}">×</button>` : ""}
         </span>
       </div>`).join("") || `<div class="small-note" style="font-size:12px;">Henüz yok</div>`;
   }
@@ -2787,7 +2793,7 @@ function renderPaymentInTotals(baseTotals){
         <span>${escapeHtml(p.name)}</span>
         <span style="display:flex;align-items:center;gap:6px;">
           <span style="color:var(--green-dark,#2a7a4b);">+${p.amount.toFixed(0)} ₺</span>
-          <button class="btn-danger btn-sm" data-type="receiver" data-idx="${i}">×</button>
+          ${totalsSelectedSession && totalsSelectedSession !== "ALL" ? `<button class="btn-danger btn-sm" data-type="receiver" data-idx="${i}">×</button>` : ""}
         </span>
       </div>`).join("") || `<div class="small-note" style="font-size:12px;">Henüz yok</div>`;
   }
